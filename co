@@ -44,7 +44,7 @@ if (!selectedBranch) {
 }
 
 const doesBranchExist = toBoolean(
-  await $`git rev-parse --verify --quiet ${selectedBranch}`.quiet()
+  await $`git rev-parse --verify --quiet ${selectedBranch}`.quiet().nothrow()
 );
 
 if (doesBranchExist) {
