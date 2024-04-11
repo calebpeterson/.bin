@@ -1,6 +1,6 @@
 #!/usr/bin/env zx
 
-import { toBoolean, stdout, lines, extract } from "./lib/index.mjs";
+import { toBoolean, lines, extract, choose } from "./lib/index.mjs";
 
 const isGitRepository = toBoolean(
   await $`git rev-parse --is-inside-work-tree`.quiet()
@@ -37,19 +37,11 @@ const availableBranches =
   filteredBranches.length > 0 ? filteredBranches : uniqueBranches;
 
 // Prompt the user to select a branch
-const selectionProc = $`choose -m -s 18 -w 30 -n 30 -b 222222 -c 000000`
-  .quiet()
-  .nothrow();
-selectionProc.stdin.write(availableBranches.join("\n"));
-selectionProc.stdin.end();
+const selectedBranch = await choose(availableBranches);
 
-const selectionOutput = await selectionProc;
-
-if (selectionOutput.code !== 0) {
+if (!selectedBranch) {
   process.exit(0);
 }
-
-const selectedBranch = stdout(selectionOutput);
 
 const doesBranchExist = toBoolean(
   await $`git rev-parse --verify --quiet ${selectedBranch}`.quiet()
