@@ -9,3 +9,7 @@ A collection of CLI scripts for my daily workflows.
 ```
 brew install zx
 ```
+
+## Scripts
+
+- `co` - checkout/create `git` branches
