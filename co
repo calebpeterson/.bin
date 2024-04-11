@@ -1,0 +1,65 @@
+#!/usr/bin/env zx
+
+import { toBoolean, stdout, lines, extract } from "./lib/index.mjs";
+
+const isGitRepository = toBoolean(
+  await $`git rev-parse --is-inside-work-tree`.quiet()
+);
+
+if (!isGitRepository) {
+  console.error("Not a git repository");
+  process.exit(1);
+}
+
+const filter = argv._[0] ?? "";
+
+const recentBranches = lines(
+  await $`git reflog show --pretty=format:'%gs'`.quiet()
+)
+  // Checkouts are the only useful reflog entries
+  .filter((entry) => entry.includes("checkout:"))
+  // Extract the branch name from each reflog entry
+  .map((entry) => extract(/moving from (\S*?) to/g, entry))
+  // Take the first 250
+  .slice(0, 250);
+
+// Unique branch names
+const uniqueBranches = [...new Set(recentBranches)];
+
+// Filter branches
+const filteredBranches = uniqueBranches.filter((branch) =>
+  branch.includes(filter)
+);
+
+// Available branches to select from - either the filter
+// or all recent branches if nothing matches the filter.
+const availableBranches =
+  filteredBranches.length > 0 ? filteredBranches : uniqueBranches;
+
+// Prompt the user to select a branch
+const selectionProc = $`choose -m -s 18 -w 30 -n 30 -b 222222 -c 000000`
+  .quiet()
+  .nothrow();
+selectionProc.stdin.write(availableBranches.join("\n"));
+selectionProc.stdin.end();
+
+const selectionOutput = await selectionProc;
+
+if (selectionOutput.code !== 0) {
+  process.exit(0);
+}
+
+const selectedBranch = stdout(selectionOutput);
+
+const doesBranchExist = toBoolean(
+  await $`git rev-parse --verify --quiet ${selectedBranch}`.quiet()
+);
+
+if (doesBranchExist) {
+  // Checkout the branch if it exists
+  await $`git checkout ${selectedBranch}`;
+} else {
+  // Create the branch if it doesn't exist
+  echo("Branch does not exist, creating...");
+  await $`git checkout -b ${selectedBranch}`;
+}
