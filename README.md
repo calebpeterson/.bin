@@ -13,3 +13,4 @@ brew install zx
 ## Scripts
 
 - `co` - checkout/create `git` branches
+- `note` - open/create note in `~/Workspace/notes`

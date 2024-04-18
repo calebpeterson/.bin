@@ -1,0 +1,35 @@
+#!/usr/bin/env zx
+
+import path from "node:path";
+
+import { lines, choose } from "./lib/index.mjs";
+
+const NOTES_ROOT = `${os.homedir()}/Workspace/notes`
+
+within(async () => {
+  cd(NOTES_ROOT);
+
+  const allNotes = lines(
+    await $`find . -type f \\
+    -not -path './node_modules/*' \\
+    -not -path './package.json' \\
+    -not -path './yarn.lock' \\
+    -not -path './.git/*' \\
+    -not -path './.gitignore' \\
+    -not -path './.DS_Store'`.quiet()
+  );
+
+  const options = allNotes.map((note) => note.replace("./", ""));
+
+  const selection = await choose(options);
+
+  if (selection) {
+    const filename = selection.endsWith(".md") ? selection : `${selection}.md`;
+    const directory = path.dirname(selection);
+
+    await $`mkdir -p ${directory}`;
+    await $`touch ${selection}`;
+
+    await $`${process.env.EDITOR} ${selection}`;
+  }
+});

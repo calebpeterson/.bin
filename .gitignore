@@ -1,3 +1,8 @@
+# Ignore certain scripts
+preview
+
+# Ignore all "compiled" scripts
 /*.mjs
 
+# Ignore macOS metadata
 .DS_Store
