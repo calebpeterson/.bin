@@ -1,0 +1,5 @@
+#!/bin/sh
+
+git log -1 --pretty=%B | pbcopy
+
+echo "\n\033[32m✔︎ Branch title copied to the clipboard\033[0m"
