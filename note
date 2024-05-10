@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { lines, choose } from "./lib/index.mjs";
 
-const NOTES_ROOT = `${os.homedir()}/Workspace/notes`
+const NOTES_ROOT = `${os.homedir()}/Workspace/notes`;
 
 within(async () => {
   cd(NOTES_ROOT);
@@ -28,8 +28,8 @@ within(async () => {
     const directory = path.dirname(selection);
 
     await $`mkdir -p ${directory}`;
-    await $`touch ${selection}`;
+    await $`touch ${filename}`;
 
-    await $`${process.env.EDITOR} ${selection}`;
+    await $`${process.env.EDITOR} ${filename}`;
   }
 });
