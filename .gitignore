@@ -1,6 +1,9 @@
 # Ignore certain scripts
 preview
 
+# Installed/managed by quickulator
+quickulator
+
 # Ignore all "compiled" scripts
 /*.mjs
 

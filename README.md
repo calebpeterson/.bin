@@ -10,6 +10,14 @@ A collection of CLI scripts for my daily workflows.
 brew install zx ; brew install choose-gui
 ```
 
+## Setup
+
+Include in `PATH` (in `~/.zshrc` etc...)
+
+```
+export PATH="${PATH}:${HOME}/.bin"
+```
+
 ## Scripts
 
 - `co` - checkout/create `git` branches
