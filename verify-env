@@ -1,0 +1,17 @@
+#!/usr/bin/env zx
+
+const TOOLS_DIR = path.join(os.homedir(), 'Tools');
+
+const check = (...parts) => {
+  const dir = path.join(...parts);
+  if (!fs.existsSync(dir)) {
+    console.warn(`${chalk.red('✖️')} Missing ${dir}`)
+  }
+  else {
+    console.warn(`${chalk.green('✔️')} Found ${dir}`)
+  }
+}
+
+check(TOOLS_DIR);
+check(TOOLS_DIR, 'quickulator');
+check(TOOLS_DIR, 'meta-x');
