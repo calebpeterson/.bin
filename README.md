@@ -4,10 +4,10 @@ A collection of CLI scripts for my daily workflows.
 
 ## Prerequisites
 
-`zx` must be installed globally
+`zx` and `choose-gui` must be installed globally
 
 ```
-brew install zx
+brew install zx ; brew install choose-gui
 ```
 
 ## Scripts
