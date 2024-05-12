@@ -14,3 +14,4 @@ brew install zx
 
 - `co` - checkout/create `git` branches
 - `note` - open/create note in `~/Workspace/notes`
+- `get-branch-title` - copy the latest commit message to the clipboard
