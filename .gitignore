@@ -1,5 +1,6 @@
 # Ignore certain scripts
 preview
+update-storyshots
 
 # Installed/managed by quickulator
 devdocs
