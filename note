@@ -2,7 +2,12 @@
 
 import path from "node:path";
 
-import { lines, choose } from "./lib/index.mjs";
+import {
+  lines,
+  choose,
+  getCurrentDate,
+  ensureExtension,
+} from "./lib/index.mjs";
 
 const NOTES_ROOT = `${os.homedir()}/Workspace/notes`;
 
@@ -19,13 +24,18 @@ within(async () => {
     -not -path './.DS_Store'`.quiet()
   );
 
-  const options = allNotes.map((note) => note.replace("./", ""));
+  const JOURNAL = "journal";
+
+  const options = [JOURNAL, ...allNotes.map((note) => note.replace("./", ""))];
 
   const selection = await choose(options);
 
   if (selection) {
-    const filename = selection.endsWith(".md") ? selection : `${selection}.md`;
-    const directory = path.dirname(selection);
+    const filename =
+      selection === JOURNAL
+        ? `${NOTES_ROOT}/journal/${getCurrentDate()}.md`
+        : ensureExtension(selection, ".md");
+    const directory = path.dirname(filename);
 
     await $`mkdir -p ${directory}`;
     await $`touch ${filename}`;
