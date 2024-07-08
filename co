@@ -1,5 +1,7 @@
 #!/usr/bin/env zx
 
+// TODO: add support for -b option to force create if no matching branches exist
+
 import { toBoolean, lines, extract, choose } from "./lib/index.mjs";
 
 const isGitRepository = toBoolean(
