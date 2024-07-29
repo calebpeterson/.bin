@@ -1,0 +1,20 @@
+#!/usr/bin/env zx
+
+import { choose, stdout } from './lib/index.mjs';
+
+const maybePackagePath = path.join(process.cwd(), 'package.json');
+const hasPackage = await fs.pathExists(maybePackagePath);
+
+if (!hasPackage) {
+  console.error(`${process.cwd()} does not include a package.json`);
+  process.exit(1);
+}
+
+const { scripts } = await fs.readJson(maybePackagePath);
+
+const target = await choose(Object.keys(scripts));
+
+if (target) {
+  const output = stdout(await $`yarn run ${target}`);
+  console.log(output);
+}
