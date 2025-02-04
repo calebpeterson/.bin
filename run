@@ -1,8 +1,10 @@
 #!/usr/bin/env zx
 
-import { choose, stdout } from './lib/index.mjs';
+import { choose } from "./lib/index.mjs";
 
-const maybePackagePath = path.join(process.cwd(), 'package.json');
+const filter = argv._[0] ?? "";
+
+const maybePackagePath = path.join(process.cwd(), "package.json");
 const hasPackage = await fs.pathExists(maybePackagePath);
 
 if (!hasPackage) {
@@ -12,9 +14,21 @@ if (!hasPackage) {
 
 const { scripts } = await fs.readJson(maybePackagePath);
 
-const target = await choose(Object.keys(scripts));
+const target = await choose(Object.keys(scripts), filter);
 
 if (target) {
-  const output = stdout(await $`yarn run ${target}`);
-  console.log(output);
+  const runner = fs.existsSync(path.join(process.cwd(), "yarn.lock"))
+    ? "yarn"
+    : fs.existsSync(path.join(process.cwd(), "pnpm-lock.yaml"))
+    ? "pnpm"
+    : "npm";
+  const { stdout, stderr } = await $`${runner} run ${target}`;
+
+  if (stdout) {
+    console.log(stdout);
+  }
+
+  if (stderr) {
+    console.log(stderr);
+  }
 }
