@@ -30,17 +30,20 @@ if (argv.models) {
   process.exit(0);
 }
 
+const model = argv.model || "gpt-4o";
+
 const messages = [];
 
-const USER_PROMPT = chalk.green("▸ ");
-const ASSISTANT_PROMPT = chalk.yellow("▸ ");
+const USER_PROMPT = chalk.white("▸ ");
+const ASSISTANT_FORMAT = chalk.blue;
+const ASSISTANT_PROMPT = ASSISTANT_FORMAT("▸ ");
 
 // Function to stream the response
 async function streamResponse(userInput) {
   messages.push({ role: "user", content: userInput });
 
   const stream = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model,
     messages,
     stream: true,
   });
@@ -49,7 +52,7 @@ async function streamResponse(userInput) {
 
   for await (const chunk of stream) {
     const content = chunk.choices[0]?.delta?.content || "";
-    process.stdout.write(content);
+    process.stdout.write(ASSISTANT_FORMAT(content));
   }
 
   process.stdout.write("\n\n" + USER_PROMPT);
