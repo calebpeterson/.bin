@@ -3,6 +3,11 @@
 import OpenAI from "openai";
 import { ENV } from "./lib/read-env.mjs";
 
+const EXIT_TOKEN = ".exit";
+const USER_PROMPT = chalk.white("▸ ");
+const ASSISTANT_FORMAT = chalk.blue;
+const ASSISTANT_PROMPT = ASSISTANT_FORMAT("▸ ");
+
 const openai = new OpenAI({
   organization: ENV.OPENAI_ORGANIZATION,
   apiKey: ENV.OPENAI_API_KEY,
@@ -34,11 +39,7 @@ const model = argv.model || "gpt-4o";
 
 const messages = [];
 
-const USER_PROMPT = chalk.white("▸ ");
-const ASSISTANT_FORMAT = chalk.blue;
-const ASSISTANT_PROMPT = ASSISTANT_FORMAT("▸ ");
-
-// Function to stream the response
+// Stream the response to the console
 async function streamResponse(userInput) {
   messages.push({ role: "user", content: userInput });
 
@@ -64,12 +65,12 @@ async function streamResponse(userInput) {
 }
 
 // Main chat loop
-console.log("Chat started. Type '.exit' to end the conversation.\n");
+console.log(`Chat started. Type '${EXIT_TOKEN}' to end the conversation.\n`);
 
 while (true) {
   const input = await question(USER_PROMPT);
 
-  if (input.toLowerCase() === ".exit") {
+  if (input.toLowerCase() === EXIT_TOKEN) {
     process.exit(0);
   }
 
