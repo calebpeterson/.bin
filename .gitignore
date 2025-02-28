@@ -1,6 +1,12 @@
+node_modules
+
+# Ignore .env file
+.env
+
 # Ignore certain scripts
 preview
 update-storyshots
+daily-work-digest
 
 # Installed/managed by quickulator
 devdocs

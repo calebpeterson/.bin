@@ -13,7 +13,7 @@ if (!isGitRepository) {
   process.exit(1);
 }
 
-const filter = argv._[0] ?? "";
+const query = argv._[0] ?? "";
 
 const recentBranches = lines(
   await $`git reflog show --pretty=format:'%gs'`.quiet()
@@ -30,7 +30,7 @@ const uniqueBranches = [...new Set(recentBranches)];
 
 // Filter branches
 const filteredBranches = uniqueBranches.filter((branch) =>
-  branch.includes(filter)
+  branch.includes(query)
 );
 
 // Available branches to select from - either the filter
@@ -39,7 +39,7 @@ const availableBranches =
   filteredBranches.length > 0 ? filteredBranches : uniqueBranches;
 
 // Prompt the user to select a branch
-const selectedBranch = await choose(availableBranches);
+const selectedBranch = await choose(availableBranches, { query });
 
 if (!selectedBranch) {
   process.exit(0);

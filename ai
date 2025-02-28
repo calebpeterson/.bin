@@ -1,0 +1,74 @@
+#!/usr/bin/env zx
+
+import OpenAI from "openai";
+import { ENV } from "./lib/read-env.mjs";
+
+const openai = new OpenAI({
+  organization: ENV.OPENAI_ORGANIZATION,
+  apiKey: ENV.OPENAI_API_KEY,
+});
+
+if (argv.models) {
+  const response = await openai.models.list();
+  const models = response.data;
+  const chatModels = models.filter(
+    (model) =>
+      // All GPT models
+      model.id.includes("gpt-") &&
+      // Exclude fine-tuned models
+      !model.id.includes("ft:")
+  );
+
+  console.log("Available Chat Models:");
+
+  console.log();
+  for (const model of chatModels) {
+    console.log("  " + model.id);
+  }
+  console.log();
+
+  process.exit(0);
+}
+
+const messages = [];
+
+const USER_PROMPT = chalk.green("▸ ");
+const ASSISTANT_PROMPT = chalk.yellow("▸ ");
+
+// Function to stream the response
+async function streamResponse(userInput) {
+  messages.push({ role: "user", content: userInput });
+
+  const stream = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages,
+    stream: true,
+  });
+
+  process.stdout.write(`\n${ASSISTANT_PROMPT}`);
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content || "";
+    process.stdout.write(content);
+  }
+
+  process.stdout.write("\n\n" + USER_PROMPT);
+
+  messages.push({
+    role: "assistant",
+    content: messages[messages.length - 1].content,
+  });
+}
+
+// Main chat loop
+console.log("Chat started. Type '.exit' to end the conversation.\n");
+
+while (true) {
+  const input = await question(USER_PROMPT);
+
+  if (input.toLowerCase() === ".exit") {
+    process.exit(0);
+  }
+
+  await streamResponse(input);
+}
