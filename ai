@@ -5,6 +5,7 @@ import { v4 as uuid4 } from "uuid";
 import { ENV } from "./lib/read-env.mjs";
 import { lines, choose } from "./lib/index.mjs";
 import { formatMarkdown } from "./lib/format-markdown.mjs";
+import { setTerminalTitle } from "./lib/set-terminal-title.mjs";
 
 console.clear();
 
@@ -91,6 +92,8 @@ if (argv.continue) {
   // Display the last message in the conversation
   console.log(ASSISTANT_PROMPT + formatMarkdown(lastMessage.content) + "\n");
 }
+
+setTerminalTitle(CONVERSATION_BASENAME);
 
 // Delete a previous conversation?
 if (argv.delete) {
@@ -184,6 +187,8 @@ while (true) {
     console.log(META_FORMAT(`Renamed conversation to "${newName}"`));
 
     CONVERSATION_BASENAME = newName;
+    setTerminalTitle(CONVERSATION_BASENAME);
+
     continue;
   }
 
