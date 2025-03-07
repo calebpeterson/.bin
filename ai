@@ -54,16 +54,25 @@ if (argv.models) {
   process.exit(0);
 }
 
+// The LLM model to use
 const model = argv.model ?? "gpt-4o";
 
+// The messages in the conversation
 const messages = [];
 
-// Continue a previous conversation?
-if (argv.continue) {
+// Prompt the user to pick from existing conversations
+const chooseConversation = async () => {
   const conversationBasenames = lines(await $`ls ${ROOT_DIR}`).map(
     (filename) => path.parse(filename).name
   );
   const conversationBasename = await choose(conversationBasenames);
+
+  return conversationBasename;
+};
+
+// Continue a previous conversation?
+if (argv.continue) {
+  const conversationBasename = await chooseConversation();
 
   if (!conversationBasename) {
     process.exit(1);
@@ -81,6 +90,21 @@ if (argv.continue) {
 
   // Display the last message in the conversation
   console.log(ASSISTANT_PROMPT + formatMarkdown(lastMessage.content) + "\n");
+}
+
+// Delete a previous conversation?
+if (argv.delete) {
+  const conversationBasename = await chooseConversation();
+
+  if (!conversationBasename) {
+    process.exit(1);
+  }
+
+  await $`rm ${ROOT_DIR}/${conversationBasename}.json`;
+
+  console.log(META_FORMAT(`Deleted conversation "${conversationBasename}"`));
+
+  process.exit(0);
 }
 
 // Append the message and journal the conversation
@@ -127,7 +151,7 @@ async function streamResponse(userInput) {
   });
 }
 
-// Main chat loop
+// Welcome message
 console.log(
   META_FORMAT(
     `Chat ${
@@ -136,6 +160,7 @@ console.log(
   )
 );
 
+// Main chat loop
 while (true) {
   const input = await question(USER_PROMPT);
 
