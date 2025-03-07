@@ -1,18 +1,37 @@
 #!/usr/bin/env zx
 
 import OpenAI from "openai";
+import { v4 as uuid4 } from "uuid";
 import { ENV } from "./lib/read-env.mjs";
+import { lines, choose } from "./lib/index.mjs";
+import { formatMarkdown } from "./lib/format-markdown.mjs";
 
-const EXIT_TOKEN = ".exit";
-const USER_PROMPT = chalk.white("▸ ");
+console.clear();
+
+const ROOT_DIR = `${os.homedir()}/.ai`;
+
+let CONVERSATION_BASENAME = uuid4();
+
+const EXIT_COMMAND = "/exit";
+const RENAME_COMMAND = "/rename";
+
+const USER_PROMPT = chalk.blue("▸ ");
+
 const ASSISTANT_FORMAT = chalk.blue;
-const ASSISTANT_PROMPT = ASSISTANT_FORMAT("▸ ");
+const ASSISTANT_PROMPT = ASSISTANT_FORMAT("");
 
+const META_FORMAT = chalk.grey.italic;
+
+// Ensure the conversations directory exists
+await $`mkdir -p ${ROOT_DIR}`;
+
+// Create the OpenAI client
 const openai = new OpenAI({
   organization: ENV.OPENAI_ORGANIZATION,
   apiKey: ENV.OPENAI_API_KEY,
 });
 
+// List models and exit if given the --models flag
 if (argv.models) {
   const response = await openai.models.list();
   const models = response.data;
@@ -35,13 +54,52 @@ if (argv.models) {
   process.exit(0);
 }
 
-const model = argv.model || "gpt-4o";
+const model = argv.model ?? "gpt-4o";
 
 const messages = [];
 
+// Continue a previous conversation?
+if (argv.continue) {
+  const conversationBasenames = lines(await $`ls ${ROOT_DIR}`).map(
+    (filename) => path.parse(filename).name
+  );
+  const conversationBasename = await choose(conversationBasenames);
+
+  if (!conversationBasename) {
+    process.exit(1);
+  }
+
+  CONVERSATION_BASENAME = conversationBasename;
+
+  const history = await fs.readJson(
+    path.join(ROOT_DIR, conversationBasename + ".json")
+  );
+
+  messages.push(...history);
+
+  const lastMessage = messages[messages.length - 1];
+
+  // Display the last message in the conversation
+  console.log(ASSISTANT_PROMPT + formatMarkdown(lastMessage.content) + "\n");
+}
+
+// Append the message and journal the conversation
+const appendMessage = (message) => {
+  messages.push({ id: uuid4(), ...message });
+  fs.writeFile(
+    path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.json`),
+    JSON.stringify(messages, null, 2),
+    (err) => {
+      if (err) {
+        console.error(err);
+      }
+    }
+  );
+};
+
 // Stream the response to the console
 async function streamResponse(userInput) {
-  messages.push({ role: "user", content: userInput });
+  appendMessage({ role: "user", content: userInput });
 
   const stream = await openai.chat.completions.create({
     model,
@@ -49,29 +107,59 @@ async function streamResponse(userInput) {
     stream: true,
   });
 
-  process.stdout.write(`\n${ASSISTANT_PROMPT}`);
+  // Show a spinner while streaming the response
+  let buffer = "";
+  await spinner(async () => {
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      buffer += content;
+    }
+  });
 
-  for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content || "";
-    process.stdout.write(ASSISTANT_FORMAT(content));
-  }
+  process.stdout.write(`\n${ASSISTANT_PROMPT}`);
+  process.stdout.write(formatMarkdown(buffer));
 
   process.stdout.write("\n\n" + USER_PROMPT);
 
-  messages.push({
+  appendMessage({
     role: "assistant",
-    content: messages[messages.length - 1].content,
+    content: buffer,
   });
 }
 
 // Main chat loop
-console.log(`Chat started. Type '${EXIT_TOKEN}' to end the conversation.\n`);
+console.log(
+  META_FORMAT(
+    `Chat ${
+      messages.length ? "resumed" : "started"
+    }. Type '${EXIT_COMMAND}' to end the conversation.\n`
+  )
+);
 
 while (true) {
   const input = await question(USER_PROMPT);
 
-  if (input.toLowerCase() === EXIT_TOKEN) {
+  if (input.toLowerCase() === ".exit") {
+    console.log(META_FORMAT(`Did you mean ${EXIT_COMMAND}?`));
+    continue;
+  }
+
+  if (input.toLowerCase() === EXIT_COMMAND) {
+    console.clear();
     process.exit(0);
+  }
+
+  if (input.startsWith(RENAME_COMMAND)) {
+    const newName = input.slice(RENAME_COMMAND.length).trim();
+    const oldPath = path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.json`);
+    const newPath = path.join(ROOT_DIR, `${newName}.json`);
+
+    await fs.rename(oldPath, newPath);
+
+    console.log(META_FORMAT(`Renamed conversation to "${newName}"`));
+
+    CONVERSATION_BASENAME = newName;
+    continue;
   }
 
   await streamResponse(input);

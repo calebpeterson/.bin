@@ -1,5 +1,8 @@
 {
   "dependencies": {
-    "openai": "^4.86.1"
+    "marked": "^15.0.7",
+    "marked-terminal": "^7.3.0",
+    "openai": "^4.86.1",
+    "uuid": "^11.1.0"
   }
 }
