@@ -32,6 +32,9 @@ const openai = new OpenAI({
   apiKey: ENV.OPENAI_API_KEY,
 });
 
+const getConversationBasenames = async () =>
+  lines(await $`ls ${ROOT_DIR}`).map((filename) => path.parse(filename).name);
+
 // List models and exit if given the --models flag
 if (argv.models) {
   const response = await openai.models.list();
@@ -63,9 +66,7 @@ const messages = [];
 
 // Prompt the user to pick from existing conversations
 const chooseConversation = async () => {
-  const conversationBasenames = lines(await $`ls ${ROOT_DIR}`).map(
-    (filename) => path.parse(filename).name
-  );
+  const conversationBasenames = await getConversationBasenames();
   const conversationBasename = await choose(conversationBasenames);
 
   return conversationBasename;
@@ -106,6 +107,21 @@ if (argv.delete) {
   await $`rm ${ROOT_DIR}/${conversationBasename}.json`;
 
   console.log(META_FORMAT(`Deleted conversation "${conversationBasename}"`));
+
+  process.exit(0);
+}
+
+// List sessions
+if (argv.list) {
+  const conversationBasenames = await getConversationBasenames();
+
+  console.log("Conversations:");
+
+  console.log();
+  for (const conversationBasename of conversationBasenames) {
+    console.log("  " + conversationBasename);
+  }
+  console.log();
 
   process.exit(0);
 }
