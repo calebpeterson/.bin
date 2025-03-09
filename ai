@@ -15,6 +15,7 @@ let CONVERSATION_BASENAME = uuid4();
 
 const EXIT_COMMAND = "/exit";
 const RENAME_COMMAND = "/rename";
+const DELETE_COMMAND = "/delete";
 
 const USER_PROMPT = chalk.blue("▸ ");
 
@@ -73,7 +74,7 @@ const chooseConversation = async () => {
 };
 
 // Continue a previous conversation?
-if (argv.continue) {
+if (argv.continue || argv.resume) {
   const conversationBasename = await chooseConversation();
 
   if (!conversationBasename) {
@@ -206,6 +207,14 @@ while (true) {
     setTerminalTitle(CONVERSATION_BASENAME);
 
     continue;
+  }
+
+  if (input.startsWith(DELETE_COMMAND)) {
+    await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.json`;
+
+    console.log(META_FORMAT(`Deleted conversation "${CONVERSATION_BASENAME}"`));
+
+    process.exit();
   }
 
   await streamResponse(input);
