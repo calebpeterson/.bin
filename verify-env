@@ -1,8 +1,20 @@
 #!/usr/bin/env zx
 
+import { stdout } from "./lib/index.mjs";
+
 const TOOLS_DIR = path.join(os.homedir(), "Tools");
 
-const check = (...parts) => {
+const checkCommand = async (command) => {
+  try {
+    // Use the `which` command to check for the provided command
+    const which = stdout(await $`which ${command}`);
+    console.log(`${chalk.green("✔️")} Found ${command} at ${which}`);
+  } catch (error) {
+    console.warn(`${chalk.red("✖️")} Missing ${command}`);
+  }
+};
+
+const checkDirectory = (...parts) => {
   const dir = path.join(...parts);
   if (!fs.existsSync(dir)) {
     console.warn(`${chalk.red("✖️")} Missing ${dir}`);
@@ -11,7 +23,9 @@ const check = (...parts) => {
   }
 };
 
-check(TOOLS_DIR);
-check(TOOLS_DIR, "devdocs");
-check(TOOLS_DIR, "quickulator");
-check(TOOLS_DIR, "meta-x");
+checkDirectory(TOOLS_DIR);
+checkDirectory(TOOLS_DIR, "devdocs");
+checkDirectory(TOOLS_DIR, "quickulator");
+checkDirectory(TOOLS_DIR, "meta-x");
+
+await checkCommand("bun");

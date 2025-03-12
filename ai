@@ -1,5 +1,6 @@
-#!/usr/bin/env zx
+#!/usr/bin/env bun
 
+import "zx/globals";
 import OpenAI from "openai";
 import { v4 as uuid4 } from "uuid";
 import { ENV } from "./lib/read-env.mjs";
