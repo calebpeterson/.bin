@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test": "vitest --run ./lib/*.test.*"
+  },
   "dependencies": {
     "ink": "^5.1.1",
     "marked": "^15.0.7",
