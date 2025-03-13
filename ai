@@ -4,9 +4,10 @@ import "zx/globals";
 import OpenAI from "openai";
 import { v4 as uuid4 } from "uuid";
 import { ENV } from "./lib/read-env.mjs";
-import { lines, choose } from "./lib/index.mjs";
-import { formatMarkdown } from "./lib/format-markdown.mjs";
-import { setTerminalTitle } from "./lib/set-terminal-title.mjs";
+import { choose } from "./lib/index.mjs";
+import { lines } from "./lib/lines";
+import { formatMarkdown } from "./lib/format-markdown";
+import { setTerminalTitle } from "./lib/set-terminal-title";
 import { stringifyChat } from "./lib/stringify-llm-chat";
 import { parseChat } from "./lib/parse-llm-chat";
 import { ChatMessage, Conversation } from "./lib/llm-types";
@@ -135,7 +136,7 @@ if (argv.list) {
 }
 
 // Append the message and journal the conversation
-const appendMessage = (message) => {
+const appendMessage = (message: ChatMessage) => {
   messages.push({ id: uuid4(), ...message });
   fs.writeFile(
     path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.md`),
@@ -149,12 +150,12 @@ const appendMessage = (message) => {
 };
 
 // Stream the response to the console
-async function streamResponse(userInput) {
+async function streamResponse(userInput: string) {
   appendMessage({ role: "user", content: userInput });
 
   const stream = await openai.chat.completions.create({
     model,
-    messages: messages as Conversation,
+    messages,
     stream: true,
   });
 
@@ -168,7 +169,7 @@ async function streamResponse(userInput) {
   });
 
   process.stdout.write(`\n${ASSISTANT_PROMPT}`);
-  process.stdout.write(formatMarkdown(buffer));
+  process.stdout.write(await formatMarkdown(buffer));
 
   process.stdout.write("\n\n" + USER_PROMPT);
 

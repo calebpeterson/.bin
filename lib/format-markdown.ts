@@ -5,7 +5,10 @@ const DEFAULT_OPTIONS = {
   tab: 2,
 };
 
-export const formatMarkdown = (markdown, options = DEFAULT_OPTIONS) => {
+export const formatMarkdown = async (
+  markdown: string,
+  options = DEFAULT_OPTIONS
+) => {
   setOptions({ renderer: new TerminalRenderer(options) });
-  return parse(markdown).trim();
+  return (await parse(markdown)).trim();
 };
