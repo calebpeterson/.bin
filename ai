@@ -7,10 +7,14 @@ import { ENV } from "./lib/read-env.mjs";
 import { lines, choose } from "./lib/index.mjs";
 import { formatMarkdown } from "./lib/format-markdown.mjs";
 import { setTerminalTitle } from "./lib/set-terminal-title.mjs";
+import { stringifyChat } from "./lib/stringify-llm-chat";
+import { parseChat } from "./lib/parse-llm-chat";
+import { ChatMessage, Conversation } from "./lib/llm-types";
 
 console.clear();
 
-const ROOT_DIR = `${os.homedir()}/.ai`;
+const BASE_DIR = argv._[0] ?? os.homedir();
+const ROOT_DIR = `${BASE_DIR}/.ai`;
 
 let CONVERSATION_BASENAME = uuid4();
 
@@ -64,7 +68,7 @@ if (argv.models) {
 const model = argv.model ?? "gpt-4o";
 
 // The messages in the conversation
-const messages = [];
+const messages: ChatMessage[] = [];
 
 // Prompt the user to pick from existing conversations
 const chooseConversation = async () => {
@@ -84,9 +88,11 @@ if (argv.continue || argv.resume) {
 
   CONVERSATION_BASENAME = conversationBasename;
 
-  const history = await fs.readJson(
-    path.join(ROOT_DIR, conversationBasename + ".json")
+  const content = await fs.readFile(
+    path.join(ROOT_DIR, conversationBasename + ".md"),
+    "utf8"
   );
+  const history = parseChat(content);
 
   messages.push(...history);
 
@@ -106,7 +112,7 @@ if (argv.delete) {
     process.exit(1);
   }
 
-  await $`rm ${ROOT_DIR}/${conversationBasename}.json`;
+  await $`rm ${ROOT_DIR}/${conversationBasename}.md`;
 
   console.log(META_FORMAT(`Deleted conversation "${conversationBasename}"`));
 
@@ -132,8 +138,8 @@ if (argv.list) {
 const appendMessage = (message) => {
   messages.push({ id: uuid4(), ...message });
   fs.writeFile(
-    path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.json`),
-    JSON.stringify(messages, null, 2),
+    path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.md`),
+    stringifyChat(messages),
     (err) => {
       if (err) {
         console.error(err);
@@ -148,7 +154,7 @@ async function streamResponse(userInput) {
 
   const stream = await openai.chat.completions.create({
     model,
-    messages,
+    messages: messages as Conversation,
     stream: true,
   });
 
@@ -197,8 +203,8 @@ while (true) {
 
   if (input.startsWith(RENAME_COMMAND)) {
     const newName = input.slice(RENAME_COMMAND.length).trim();
-    const oldPath = path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.json`);
-    const newPath = path.join(ROOT_DIR, `${newName}.json`);
+    const oldPath = path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.md`);
+    const newPath = path.join(ROOT_DIR, `${newName}.md`);
 
     await fs.rename(oldPath, newPath);
 
@@ -211,7 +217,7 @@ while (true) {
   }
 
   if (input.startsWith(DELETE_COMMAND)) {
-    await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.json`;
+    await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.md`;
 
     console.log(META_FORMAT(`Deleted conversation "${CONVERSATION_BASENAME}"`));
 
