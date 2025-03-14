@@ -70,6 +70,16 @@ export const parseChat = async (
       currentRole = trimmed.replace("<!-- role: ", "").replace(" -->", "");
       currentMessage = [];
     } else if (trimmed.startsWith("<!-- include: ")) {
+      // Save the previous message before starting a new one
+      if (currentRole !== null && currentMessage.length > 0) {
+        messages.push({
+          role: currentRole,
+          content: currentMessage.join("\n").trim(),
+        });
+        currentRole = null;
+        currentMessage = [];
+      }
+
       // Handle includes **sequentially**
       const includePath = trimmed
         .replace("<!-- include: ", "")
@@ -91,7 +101,7 @@ export const parseChat = async (
   }
 
   // Capture the last message
-  if (currentRole !== null) {
+  if (currentRole !== null && currentMessage.length > 0) {
     messages.push({
       role: currentRole,
       content: currentMessage.join("\n").trim(),

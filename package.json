@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "test": "vitest --run ./lib/*.test.*"
+    "test": "vitest --run ./lib/*.test.*",
+    "test:watch": "vitest --watch ./lib/*.test.*"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",

@@ -1,6 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { parseChat } from "./parse-llm-chat";
-import { stringifyChat } from "./stringify-llm-chat";
 
 describe("parseChat", () => {
   describe("valid parsing", () => {
@@ -60,6 +59,96 @@ This is an assistant message.
         "messages",
         expectedOutput
       );
+    });
+  });
+
+  describe("frontmatter handling", () => {
+    it("parses a chat with frontmatter metadata", async () => {
+      const input = `---
+title: Test Conversation
+model: gpt-4
+---
+
+<!-- role: user -->
+Hi there!`;
+
+      const result = await parseChat(input);
+
+      expect(result).toEqual({
+        meta: { title: "Test Conversation", model: "gpt-4" },
+        messages: [{ role: "user", content: "Hi there!" }],
+      });
+    });
+
+    it("handles missing frontmatter gracefully", async () => {
+      const input = `<!-- role: system -->
+This is a system message.`;
+
+      const result = await parseChat(input);
+
+      expect(result).toEqual({
+        meta: {},
+        messages: [{ role: "system", content: "This is a system message." }],
+      });
+    });
+  });
+
+  describe("include directive", () => {
+    it("processes an include using a custom include handler", async () => {
+      const input = `<!-- role: user -->
+First message.
+
+<!-- include: included.md -->
+
+<!-- role: assistant -->
+Final message.`;
+
+      const mockIncludeHandler = vi.fn(async (includePath) => {
+        if (includePath === "included.md") {
+          return `<!-- role: assistant -->
+This is an included message.`;
+        }
+        return null;
+      });
+
+      const result = await parseChat(input, ".", {
+        include: mockIncludeHandler,
+      });
+
+      expect(mockIncludeHandler).toHaveBeenCalledWith("included.md", ".");
+      expect(result).toEqual({
+        meta: {},
+        messages: [
+          { role: "user", content: "First message." },
+          { role: "assistant", content: "This is an included message." },
+          { role: "assistant", content: "Final message." },
+        ],
+      });
+    });
+
+    it("skips missing includes gracefully", async () => {
+      const input = `<!-- role: user -->
+First message.
+
+<!-- include: missing.md -->
+
+<!-- role: assistant -->
+Final message.`;
+
+      const mockIncludeHandler = vi.fn(async () => null);
+
+      const result = await parseChat(input, ".", {
+        include: mockIncludeHandler,
+      });
+
+      expect(mockIncludeHandler).toHaveBeenCalledWith("missing.md", ".");
+      expect(result).toEqual({
+        meta: {},
+        messages: [
+          { role: "user", content: "First message." },
+          { role: "assistant", content: "Final message." },
+        ],
+      });
     });
   });
 });
