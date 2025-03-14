@@ -22,7 +22,10 @@ This is an assistant message.
         { role: "assistant", content: "This is an assistant message." },
       ];
 
-      await expect(parseChat(chatString)).resolves.toEqual(expectedOutput);
+      await expect(parseChat(chatString)).resolves.toHaveProperty(
+        "messages",
+        expectedOutput
+      );
     });
   });
 
@@ -42,7 +45,10 @@ This is an assistant message.
         { role: "assistant", content: "" },
       ];
 
-      await expect(parseChat(chatString)).resolves.toEqual(expectedOutput);
+      await expect(parseChat(chatString)).resolves.toHaveProperty(
+        "messages",
+        expectedOutput
+      );
     });
 
     it("should return an empty array if no valid comments are found", async () => {
@@ -50,7 +56,10 @@ This is an assistant message.
 
       const expectedOutput: { role: string; content: string }[] = [];
 
-      await expect(parseChat(chatString)).resolves.toEqual(expectedOutput);
+      await expect(parseChat(chatString)).resolves.toHaveProperty(
+        "messages",
+        expectedOutput
+      );
     });
   });
 });

@@ -3,6 +3,7 @@
     "test": "vitest --run ./lib/*.test.*"
   },
   "dependencies": {
+    "gray-matter": "^4.0.3",
     "ink": "^5.1.1",
     "marked": "^15.0.7",
     "marked-terminal": "^7.3.0",

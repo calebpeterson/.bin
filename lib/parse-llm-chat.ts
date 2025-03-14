@@ -1,5 +1,6 @@
 import "zx/globals";
 import { ChatMessage, Conversation } from "./llm-types";
+import matter from "gray-matter";
 
 type IncludeHandler = (
   includePath: string,
@@ -8,6 +9,11 @@ type IncludeHandler = (
 
 interface ParseChatOptions {
   include?: IncludeHandler;
+}
+
+interface ParsedConversation {
+  meta: Record<string, unknown>;
+  messages: Conversation;
 }
 
 /**
@@ -39,12 +45,15 @@ export const parseChat = async (
   chatString: string,
   basePath = ".",
   options: ParseChatOptions = {}
-): Promise<ChatMessage[]> => {
+): Promise<ParsedConversation> => {
   const includeHandler = options.include ?? includeFromFile;
-  const lines = chatString.split("\n");
   const messages: ChatMessage[] = [];
   let currentRole: string | null = null;
   let currentMessage: string[] = [];
+
+  // Extract frontmatter using gray-matter
+  const { data: meta, content } = matter(chatString);
+  const lines = content.split("\n");
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -68,7 +77,7 @@ export const parseChat = async (
       const includedContent = await includeHandler(includePath, basePath);
 
       if (includedContent) {
-        const includedMessages = await parseChat(
+        const { messages: includedMessages } = await parseChat(
           includedContent,
           path.dirname(path.resolve(basePath, includePath)),
           options
@@ -89,5 +98,5 @@ export const parseChat = async (
     });
   }
 
-  return messages;
+  return { messages, meta };
 };

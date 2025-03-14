@@ -66,7 +66,7 @@ if (argv.models) {
 }
 
 // The LLM model to use
-const model = argv.model ?? "gpt-4o";
+let model = argv.model ?? "gpt-4o";
 
 // The messages in the conversation
 const messages: ChatMessage[] = [];
@@ -93,7 +93,11 @@ if (argv.continue || argv.resume) {
     path.join(ROOT_DIR, conversationBasename + ".md"),
     "utf8"
   );
-  const history = await parseChat(content);
+  const { meta, messages: history } = await parseChat(content);
+
+  if ("model" in meta) {
+    model = meta.model;
+  }
 
   messages.push(...history);
 
@@ -140,7 +144,7 @@ const appendMessage = (message: ChatMessage) => {
   messages.push({ id: uuid4(), ...message });
   fs.writeFile(
     path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.md`),
-    stringifyChat(messages),
+    stringifyChat(messages, { model }),
     (err) => {
       if (err) {
         console.error(err);
@@ -179,12 +183,11 @@ async function streamResponse(userInput: string) {
   });
 }
 
+const action = messages.length ? "resumed" : "started";
 // Welcome message
 console.log(
   META_FORMAT(
-    `Chat ${
-      messages.length ? "resumed" : "started"
-    }. Type '${EXIT_COMMAND}' to end the conversation.\n`
+    `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation.\n`
   )
 );
 
