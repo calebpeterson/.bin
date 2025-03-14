@@ -93,7 +93,7 @@ if (argv.continue || argv.resume) {
     path.join(ROOT_DIR, conversationBasename + ".md"),
     "utf8"
   );
-  const history = parseChat(content);
+  const history = await parseChat(content);
 
   messages.push(...history);
 
@@ -191,6 +191,11 @@ console.log(
 // Main chat loop
 while (true) {
   const input = await question(USER_PROMPT);
+
+  // Ignore empty input
+  if (input.trim() === "") {
+    continue;
+  }
 
   if (input.toLowerCase() === ".exit") {
     console.log(META_FORMAT(`Did you mean ${EXIT_COMMAND}?`));

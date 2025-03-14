@@ -4,7 +4,7 @@ import { stringifyChat } from "./stringify-llm-chat";
 
 describe("parseChat", () => {
   describe("valid parsing", () => {
-    it("should correctly parse a chat string into role-message objects", () => {
+    it("should correctly parse a chat string into role-message objects", async () => {
       const chatString = `
 <!-- role: system -->
 This is a system message.
@@ -22,12 +22,12 @@ This is an assistant message.
         { role: "assistant", content: "This is an assistant message." },
       ];
 
-      expect(parseChat(chatString)).toEqual(expectedOutput);
+      await expect(parseChat(chatString)).resolves.toEqual(expectedOutput);
     });
   });
 
   describe("edge cases", () => {
-    it("should handle empty messages correctly", () => {
+    it("should handle empty messages correctly", async () => {
       const chatString = `
 <!-- role: system -->
 
@@ -42,15 +42,15 @@ This is an assistant message.
         { role: "assistant", content: "" },
       ];
 
-      expect(parseChat(chatString)).toEqual(expectedOutput);
+      await expect(parseChat(chatString)).resolves.toEqual(expectedOutput);
     });
 
-    it("should return an empty array if no valid comments are found", () => {
+    it("should return an empty array if no valid comments are found", async () => {
       const chatString = `This is just text with no valid role comments.`;
 
       const expectedOutput: { role: string; content: string }[] = [];
 
-      expect(parseChat(chatString)).toEqual(expectedOutput);
+      await expect(parseChat(chatString)).resolves.toEqual(expectedOutput);
     });
   });
 });

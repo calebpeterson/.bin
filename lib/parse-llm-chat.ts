@@ -1,18 +1,92 @@
-import { Conversation } from "./llm-types";
+import "zx/globals";
+import { ChatMessage, Conversation } from "./llm-types";
 
-export const parseChat = (chat: string): Conversation => {
-  // Split chat based on role comments
-  const parts = chat
-    .trim()
-    .split(/<!--\s*role:\s*(\w+)\s*-->/)
-    .map((part) => part.trim());
+type IncludeHandler = (
+  includePath: string,
+  basePath: string
+) => Promise<string | null>;
 
-  const messages: { role: string; message: string }[] = [];
+interface ParseChatOptions {
+  include?: IncludeHandler;
+}
 
-  for (let i = 1; i < parts.length; i += 2) {
-    const role = parts[i];
-    const content = parts[i + 1] || ""; // Ensure message is not undefined
-    messages.push({ role, content });
+/**
+ * Default async file-based include handler.
+ * Reads the included file from disk asynchronously.
+ */
+export const includeFromFile: IncludeHandler = async (
+  includePath,
+  basePath
+) => {
+  const fullPath = path.resolve(basePath, includePath);
+  try {
+    return await fs.readFile(fullPath, "utf8");
+  } catch {
+    console.warn(`Failed to include "${includePath}"`);
+    return "";
+  }
+};
+
+/**
+ * Parses a Markdown-based chat log asynchronously, handling includes **sequentially**.
+ *
+ * @param chatString - The raw chat string.
+ * @param basePath - The base directory for resolving includes.
+ * @param options - Optional parameters including an async include handler (defaults to fileIncludeHandler).
+ * @returns A Promise resolving to an array of parsed chat messages.
+ */
+export const parseChat = async (
+  chatString: string,
+  basePath = ".",
+  options: ParseChatOptions = {}
+): Promise<ChatMessage[]> => {
+  const includeHandler = options.include ?? includeFromFile;
+  const lines = chatString.split("\n");
+  const messages: ChatMessage[] = [];
+  let currentRole: string | null = null;
+  let currentMessage: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith("<!-- role: ")) {
+      // Save the previous message before starting a new one
+      if (currentRole !== null) {
+        messages.push({
+          role: currentRole,
+          content: currentMessage.join("\n").trim(),
+        });
+      }
+
+      currentRole = trimmed.replace("<!-- role: ", "").replace(" -->", "");
+      currentMessage = [];
+    } else if (trimmed.startsWith("<!-- include: ")) {
+      // Handle includes **sequentially**
+      const includePath = trimmed
+        .replace("<!-- include: ", "")
+        .replace(" -->", "");
+      const includedContent = await includeHandler(includePath, basePath);
+
+      if (includedContent) {
+        const includedMessages = await parseChat(
+          includedContent,
+          path.dirname(path.resolve(basePath, includePath)),
+          options
+        );
+        messages.push(...includedMessages);
+      }
+    } else {
+      // Collect message content
+      currentMessage.push(line);
+    }
+  }
+
+  // Capture the last message
+  if (currentRole !== null) {
+    messages.push({
+      role: currentRole,
+      content: currentMessage.join("\n").trim(),
+    });
   }
 
   return messages;
