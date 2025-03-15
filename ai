@@ -22,6 +22,7 @@ let CONVERSATION_BASENAME = uuid4();
 const EXIT_COMMAND = "/exit";
 const RENAME_COMMAND = "/rename";
 const DELETE_COMMAND = "/delete";
+const COPY_COMMAND = "/copy";
 
 const USER_PROMPT = chalk.blue("▸ ");
 
@@ -104,7 +105,8 @@ if (argv.continue || argv.resume) {
   const lastMessage = messages[messages.length - 1];
 
   // Display the last message in the conversation
-  console.log(ASSISTANT_PROMPT + formatMarkdown(lastMessage.content) + "\n");
+  const lastMessageFormatted = await formatMarkdown(lastMessage.content);
+  console.log(ASSISTANT_PROMPT + lastMessageFormatted + "\n");
 }
 
 setTerminalTitle(CONVERSATION_BASENAME);
@@ -208,6 +210,13 @@ while (true) {
   if (input.toLowerCase() === EXIT_COMMAND) {
     console.clear();
     process.exit(0);
+  }
+
+  if (input.startsWith(COPY_COMMAND)) {
+    await $`echo ${messages[messages.length - 1].content} | pbcopy`;
+    console.log(META_FORMAT(`Copied last message to clipboard.`));
+
+    continue;
   }
 
   if (input.startsWith(RENAME_COMMAND)) {
