@@ -20,9 +20,11 @@ const ROOT_DIR = `${BASE_DIR}/.ai`;
 let CONVERSATION_BASENAME = uuid4();
 
 const EXIT_COMMAND = "/exit";
+const NEW_COMMAND = "/new";
 const RENAME_COMMAND = "/rename";
 const DELETE_COMMAND = "/delete";
 const COPY_COMMAND = "/copy";
+const STATUS_COMMAND = "/status";
 
 const USER_PROMPT = chalk.blue("▸ ");
 
@@ -70,7 +72,7 @@ if (argv.models) {
 let model = argv.model ?? "gpt-4o";
 
 // The messages in the conversation
-const messages: ChatMessage[] = [];
+const messages: Conversation = [];
 
 // Prompt the user to pick from existing conversations
 const chooseConversation = async () => {
@@ -169,7 +171,7 @@ async function streamResponse(userInput: string) {
   let buffer = "";
   await spinner(async () => {
     for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || "";
+      const content = chunk.choices[0]?.delta?.content ?? "";
       buffer += content;
     }
   });
@@ -185,8 +187,8 @@ async function streamResponse(userInput: string) {
   });
 }
 
-const action = messages.length ? "resumed" : "started";
 // Welcome message
+const action = messages.length ? "resumed" : "started";
 console.log(
   META_FORMAT(
     `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation.\n`
@@ -204,6 +206,22 @@ while (true) {
 
   if (input.toLowerCase() === ".exit") {
     console.log(META_FORMAT(`Did you mean ${EXIT_COMMAND}?`));
+    continue;
+  }
+
+  if (input.toLowerCase() === NEW_COMMAND) {
+    console.clear();
+    messages.length = 0;
+    CONVERSATION_BASENAME = uuid4();
+    setTerminalTitle(CONVERSATION_BASENAME);
+    console.log(META_FORMAT(`Started new conversation with ${model}.`));
+    continue;
+  }
+
+  if (input.toLowerCase() === STATUS_COMMAND) {
+    console.log(META_FORMAT(`Conversation: ${CONVERSATION_BASENAME}`));
+    console.log(META_FORMAT(`Model:        ${model}`));
+    console.log(META_FORMAT(`Messages:     ${messages.length}`));
     continue;
   }
 
