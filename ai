@@ -1,5 +1,11 @@
 #!/usr/bin/env bun
 
+/*
+ * TODO:
+ *
+ * Inject selection + prompt into a new session
+ */
+
 import "zx/globals";
 import OpenAI from "openai";
 import { v4 as uuid4 } from "uuid";
@@ -8,6 +14,7 @@ import { choose } from "./lib/index.mjs";
 import { lines } from "./lib/lines";
 import { formatMarkdown } from "./lib/format-markdown";
 import { setTerminalTitle } from "./lib/set-terminal-title";
+import { setStatusLine } from "./lib/set-status-line";
 import { stringifyChat } from "./lib/stringify-llm-chat";
 import { parseChat } from "./lib/parse-llm-chat";
 import { ChatMessage, Conversation } from "./lib/llm-types";
@@ -27,6 +34,7 @@ const COPY_COMMAND = "/copy";
 const STATUS_COMMAND = "/status";
 
 const USER_PROMPT = chalk.blue("▸ ");
+const USER_PROMPT_2 = chalk.blue("  ");
 
 const ASSISTANT_FORMAT = chalk.blue;
 const ASSISTANT_PROMPT = ASSISTANT_FORMAT("");
@@ -191,18 +199,17 @@ async function streamResponse(userInput: string) {
 const action = messages.length ? "resumed" : "started";
 console.log(
   META_FORMAT(
-    `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation.\n`
+    `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation. An empty line sends the current message buffer.\n`
   )
 );
 
+let inputBuffer = "";
+
 // Main chat loop
 while (true) {
-  const input = await question(USER_PROMPT);
-
-  // Ignore empty input
-  if (input.trim() === "") {
-    continue;
-  }
+  const input = await question(
+    inputBuffer.length === 0 ? USER_PROMPT : USER_PROMPT_2
+  );
 
   if (input.toLowerCase() === ".exit") {
     console.log(META_FORMAT(`Did you mean ${EXIT_COMMAND}?`));
@@ -214,7 +221,7 @@ while (true) {
     messages.length = 0;
     CONVERSATION_BASENAME = uuid4();
     setTerminalTitle(CONVERSATION_BASENAME);
-    console.log(META_FORMAT(`Started new conversation with ${model}.`));
+    console.log(META_FORMAT(`Started a new conversation with ${model}.`));
     continue;
   }
 
@@ -260,5 +267,15 @@ while (true) {
     process.exit();
   }
 
-  await streamResponse(input);
+  // Non-empty lines are appended to the current message
+  if (input.length !== 0) {
+    inputBuffer += input;
+    setStatusLine("Press ENTER again to send the message.");
+    continue;
+  }
+
+  await streamResponse(inputBuffer);
+
+  inputBuffer = "";
+  setStatusLine("");
 }
