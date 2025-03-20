@@ -1,23 +1,81 @@
 #!/usr/bin/env bun
 
 import "zx/globals";
-import React, { useState, useEffect } from "react";
-import { render, Text } from "ink";
+import React, { useState, Fragment } from "react";
+import { render, Box, Text, useInput, useFocus, Spacer } from "ink";
 
-const Counter = () => {
-  const [counter, setCounter] = useState(0);
+import { useEffect } from "react";
+import { useStdout } from "ink";
+
+function useStdoutDimensions(): [number, number] {
+  const { stdout } = useStdout();
+  const [dimensions, setDimensions] = useState<[number, number]>([
+    stdout.columns,
+    stdout.rows,
+  ]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCounter((previousCounter) => previousCounter + 1);
-    }, 100);
-
+    const handler = () => setDimensions([stdout.columns, stdout.rows]);
+    stdout.on("resize", handler);
     return () => {
-      clearInterval(timer);
+      stdout.off("resize", handler);
     };
-  }, []);
+  }, [stdout]);
 
-  return <Text color="green">{counter} tests passed</Text>;
+  return dimensions;
+}
+
+const App = () => {
+  useFocus({ isActive: true });
+
+  const [columns, rows] = useStdoutDimensions();
+
+  const [buffer, setBuffer] = useState([]);
+  const [prompt, setPrompt] = useState("");
+
+  useInput((input, key) => {
+    if (key.return) {
+      setBuffer([...buffer, prompt]);
+      setPrompt("");
+    } else if (key.backspace) {
+      setPrompt((prompt) => prompt.slice(0, -1));
+    } else {
+      setPrompt((prompt) => prompt + input);
+    }
+  });
+
+  return (
+    <Box
+      width={columns}
+      height={rows}
+      minHeight="100%"
+      flexDirection="column"
+      justifyContent="space-between"
+    >
+      <Box flexGrow={1} flexDirection="column" height="100%" width="100%">
+        {buffer.map((line, index) => (
+          <Text key={index}>
+            <Text color="gray">: </Text>
+            {line}
+          </Text>
+        ))}
+        <Text>
+          <Text color="green">: </Text>
+          {prompt}
+        </Text>
+      </Box>
+      <Spacer />
+      <Box>
+        <Text>Length: {prompt.length}</Text>
+      </Box>
+    </Box>
+  );
 };
 
-render(<Counter />);
+console.clear();
+
+const { waitUntilExit } = render(<App />);
+
+await waitUntilExit();
+
+console.clear();
