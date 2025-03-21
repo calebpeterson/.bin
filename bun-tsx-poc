@@ -1,13 +1,18 @@
 #!/usr/bin/env bun
 
 import "zx/globals";
-import React, { useState, Fragment } from "react";
-import { render, Box, Text, useInput, useFocus, Spacer } from "ink";
+import React, {
+  createContext,
+  memo,
+  useContext,
+  useState,
+  useEffect,
+} from "react";
+import { render, Box, Text, useInput, useFocus, Spacer, useStdout } from "ink";
 
-import { useEffect } from "react";
-import { useStdout } from "ink";
+const SHOW_DEV_TOOLS = true;
 
-function useStdoutDimensions(): [number, number] {
+const useStdoutDimensions = (): [number, number] => {
   const { stdout } = useStdout();
   const [dimensions, setDimensions] = useState<[number, number]>([
     stdout.columns,
@@ -23,52 +28,124 @@ function useStdoutDimensions(): [number, number] {
   }, [stdout]);
 
   return dimensions;
+};
+
+interface StateContextProps {
+  status: string;
+  setStatus: (status: string) => void;
 }
 
-const App = () => {
-  useFocus({ isActive: true });
+const StateContext = createContext<StateContextProps>({
+  status: "",
+  setStatus: () => {},
+});
 
-  const [columns, rows] = useStdoutDimensions();
+const StateProvider: FC<{ children: React.ReactNode } & StateContextProps> = ({
+  children,
+  ...props
+}) => {
+  return (
+    <StateContext.Provider value={props}>{children}</StateContext.Provider>
+  );
+};
 
-  const [buffer, setBuffer] = useState([]);
-  const [prompt, setPrompt] = useState("");
+interface MessageProps {
+  message: string;
+}
+
+const Message: FC<MessageProps> = memo(({ message }) => {
+  return (
+    <Text>
+      <Text color="gray">: </Text>
+      {message}
+    </Text>
+  );
+});
+
+interface InputProps {
+  prompt: string;
+  onCommit: (prompt: string) => void;
+  onDevMessage: (message: string) => void;
+}
+
+const Input: FC<InputProps> = memo(({ prompt, onCommit, onDevMessage }) => {
+  const { setStatus } = useContext(StateContext);
+
+  const [value, setValue] = useState("");
 
   useInput((input, key) => {
+    onDevMessage(
+      `${input} ${JSON.stringify(key)
+        .replace(/"/g, "")
+        .replace(/Arrow/g, "")
+        .replace(/true/g, "T")
+        .replace(/false/g, "F")}`
+    );
+
     if (key.return) {
-      setBuffer([...buffer, prompt]);
-      setPrompt("");
-    } else if (key.backspace) {
-      setPrompt((prompt) => prompt.slice(0, -1));
+      setValue("");
+      onCommit(value);
+    } else if (key.delete) {
+      setValue((value: string) => value.slice(0, -1));
+    } else if (input === "g" && key.ctrl) {
+      setValue("");
     } else {
-      setPrompt((prompt) => prompt + input);
+      setValue((value: string) => value + input);
     }
+
+    setStatus(`Length: ${value.length}`);
   });
 
   return (
-    <Box
-      width={columns}
-      height={rows}
-      minHeight="100%"
-      flexDirection="column"
-      justifyContent="space-between"
-    >
-      <Box flexGrow={1} flexDirection="column" height="100%" width="100%">
-        {buffer.map((line, index) => (
-          <Text key={index}>
-            <Text color="gray">: </Text>
-            {line}
-          </Text>
-        ))}
-        <Text>
-          <Text color="green">: </Text>
-          {prompt}
-        </Text>
+    <Text>
+      <Text color="green">{prompt}</Text>
+      {value}
+    </Text>
+  );
+});
+
+const App = () => {
+  const [columns, rows] = useStdoutDimensions();
+
+  const [status, setStatus] = useState("");
+
+  const [buffer, setBuffer] = useState([]);
+  const [devMessage, setDevMessage] = useState("");
+
+  const onCommit = (input: string) => {
+    setBuffer([...buffer, input]);
+  };
+
+  return (
+    <StateProvider status={status} setStatus={setStatus}>
+      <Box
+        width={columns}
+        height={rows}
+        minHeight="100%"
+        flexDirection="column"
+        justifyContent="space-between"
+      >
+        <Box flexGrow={1} flexDirection="column" height="100%" width="100%">
+          {buffer.map((line, index) => (
+            <Message key={index} message={line} />
+          ))}
+          <Input prompt=": " onCommit={onCommit} onDevMessage={setDevMessage} />
+        </Box>
+        <Spacer />
+        <Box>
+          <Text>{status}</Text>
+        </Box>
+
+        {SHOW_DEV_TOOLS && (
+          <Box borderStyle="round" borderColor="gray" gap={1}>
+            <Text color="gray">
+              {columns} x {rows}
+            </Text>
+            <Text color="gray">{devMessage}</Text>
+          </Box>
+        )}
       </Box>
-      <Spacer />
-      <Box>
-        <Text>Length: {prompt.length}</Text>
-      </Box>
-    </Box>
+    </StateProvider>
   );
 };
 
