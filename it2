@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ "$#" -lt 1 ]; then
+    echo "Usage: iterm-open-command <command>"
+    exit 1
+fi
+
+COMMAND="$*"
+
+osascript <<EOF
+tell application "iTerm"
+    create window with default profile
+
+    tell the current session of current window
+        write text "$COMMAND"
+    end tell
+end tell
+
+tell application "System Events"
+    tell process "iTerm2"
+        -- Access the "Window" menu and click the "Center" menu item
+        click menu item "Center" of menu "Window" of menu bar 1
+    end tell
+end tell
+EOF
