@@ -260,11 +260,21 @@ while (true) {
   }
 
   if (input.startsWith(DELETE_COMMAND)) {
-    await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.md`;
+    console.clear();
 
+    // Clean up the conversation file
+    await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.md`;
     console.log(META_FORMAT(`Deleted conversation "${CONVERSATION_BASENAME}"`));
 
-    process.exit();
+    // Flush the messages
+    messages.length = 0;
+
+    // Start a new conversation
+    CONVERSATION_BASENAME = uuid4();
+    setTerminalTitle(CONVERSATION_BASENAME);
+    console.log(META_FORMAT(`Started a new conversation with ${model}.`));
+
+    continue;
   }
 
   // Non-empty lines are appended to the current message
