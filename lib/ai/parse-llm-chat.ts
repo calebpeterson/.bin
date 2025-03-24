@@ -1,6 +1,7 @@
 import "zx/globals";
 import { ChatMessage, Conversation } from "./llm-types";
 import matter from "gray-matter";
+import { META_FORMAT } from "./constants";
 
 type IncludeHandler = (
   includePath: string,
@@ -104,7 +105,9 @@ export const parseChat = async (
       if (importedContent) {
         const importedLines = importedContent.split("\n");
 
-        console.log(`Read ${importedLines.length} lines from "${importPath}"`);
+        console.log(
+          META_FORMAT(`Read ${importedLines.length} lines from "${importPath}"`)
+        );
 
         currentMessage.push(...importedLines);
       } else {

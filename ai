@@ -111,6 +111,44 @@ if (argv.continue || argv.resume) {
   console.log(ASSISTANT_PROMPT + lastMessageFormatted + "\n");
 }
 
+if (argv.complete) {
+  const conversationBasename = argv.complete;
+
+  if (!conversationBasename) {
+    console.log(
+      META_FORMAT(`Usage: ${process.argv[1]} --complete <conversation>`)
+    );
+    process.exit(1);
+  }
+
+  const content = await fs.readFile(
+    path.join(ROOT_DIR, conversationBasename + ".md"),
+    "utf8"
+  );
+  const { meta, messages } = await parseChat(content);
+
+  if ("model" in meta) {
+    model = meta.model;
+  }
+
+  const response = await completeConversation(model, messages);
+
+  const completed = [
+    ...messages,
+    {
+      role: "assistant",
+      content: response,
+    },
+  ];
+
+  const target = argv.target;
+  if (target) {
+    writeConversation(ROOT_DIR, target, completed, { model });
+  }
+
+  process.exit(0);
+}
+
 // Delete a previous conversation
 if (argv.delete) {
   const conversationBasename = await chooseConversation(ROOT_DIR);
