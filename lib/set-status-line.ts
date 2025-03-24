@@ -13,7 +13,7 @@ export const setStatusLine = (message: string) => {
   readline.clearLine(process.stdout, 0);
 
   // Write the message
-  process.stdout.write(chalk.gray.italic(message) + "\n");
+  process.stdout.write("  " + chalk.gray.italic(message) + "\n");
 
   // Determine the width of the terminal
   const terminalWidth = process.stdout.columns;
