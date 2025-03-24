@@ -10,6 +10,11 @@ import React, {
 } from "react";
 import { render, Box, Text, useInput, useFocus, Spacer, useStdout } from "ink";
 
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 const SHOW_DEV_TOOLS = true;
 
 const useStdoutDimensions = (): [number, number] => {
@@ -50,15 +55,20 @@ const StateProvider: FC<{ children: React.ReactNode } & StateContextProps> = ({
 };
 
 interface MessageProps {
-  message: string;
+  message: ChatMessage;
 }
 
 const Message: FC<MessageProps> = memo(({ message }) => {
+  const { role, content } = message;
+
   return (
-    <Text>
-      <Text color="gray">: </Text>
-      {message}
-    </Text>
+    <Box>
+      <Text color={role === "user" ? "blue" : "yellow"}>: </Text>
+      <Text color={role === "user" ? "blue" : "yellow"}>
+        {content}
+        {"\n"}
+      </Text>
+    </Box>
   );
 });
 
@@ -72,6 +82,10 @@ const Input: FC<InputProps> = memo(({ prompt, onCommit, onDevMessage }) => {
   const { setStatus } = useContext(StateContext);
 
   const [value, setValue] = useState("");
+  const [cursor, setCursor] = useState(0);
+
+  const canCommit =
+    value.length > 0 && value.lastIndexOf("\n") !== value.length - 1;
 
   useInput((input, key) => {
     onDevMessage(
@@ -82,24 +96,54 @@ const Input: FC<InputProps> = memo(({ prompt, onCommit, onDevMessage }) => {
         .replace(/false/g, "F")}`
     );
 
-    if (key.return) {
+    if (key.return && canCommit) {
       setValue("");
-      onCommit(value);
-    } else if (key.delete) {
+      setCursor(0);
+      onCommit(value.trim());
+    } else if (key.return) {
+      setValue((value: string) => value + "\n");
+    } else if (key.delete || key.backspace) {
       setValue((value: string) => value.slice(0, -1));
+      setCursor((c: number) => c - 1);
     } else if (input === "g" && key.ctrl) {
       setValue("");
+      setCursor(0);
+    } else if (key.leftArrow || (input === "b" && key.ctrl)) {
+      setCursor((c: number) => Math.max(c - 1, 0));
+    } else if (key.rightArrow || (input === "f" && key.ctrl)) {
+      setCursor((c: number) => Math.min(c + 1, value.length));
+    } else if (input === "a" && key.ctrl) {
+      setCursor(0);
+    } else if (input === "e" && key.ctrl) {
+      setCursor(value.length);
     } else {
       setValue((value: string) => value + input);
+      setCursor((c: number) => c + 1);
     }
-
-    setStatus(`Length: ${value.length}`);
   });
+
+  useEffect(() => {
+    setStatus(`Length: ${value.length} Cursor: ${cursor}`);
+  }, [value]);
+
+  const before = value.slice(0, cursor);
+  const current = value[cursor];
+  const after = value.slice(cursor + 1);
 
   return (
     <Text>
       <Text color="green">{prompt}</Text>
-      {value}
+      <Text>{before}</Text>
+      <Text color="black" backgroundColor="white">
+        {current}
+      </Text>
+      {after.length === 0 && !current ? (
+        <Text color="black" backgroundColor="white">
+          {" "}
+        </Text>
+      ) : (
+        <Text>{after}</Text>
+      )}
     </Text>
   );
 });
@@ -109,11 +153,15 @@ const App = () => {
 
   const [status, setStatus] = useState("");
 
-  const [buffer, setBuffer] = useState([]);
+  const [buffer, setBuffer] = useState<ChatMessage[]>([]);
   const [devMessage, setDevMessage] = useState("");
 
   const onCommit = (input: string) => {
-    setBuffer([...buffer, input]);
+    setBuffer([
+      ...buffer,
+      { role: "user", content: input },
+      { role: "assistant", content: input },
+    ]);
   };
 
   return (
@@ -126,8 +174,8 @@ const App = () => {
         justifyContent="space-between"
       >
         <Box flexGrow={1} flexDirection="column" height="100%" width="100%">
-          {buffer.map((line, index) => (
-            <Message key={index} message={line} />
+          {buffer.map((message, index) => (
+            <Message key={index} message={message} />
           ))}
           <Input prompt=": " onCommit={onCommit} onDevMessage={setDevMessage} />
         </Box>
@@ -138,10 +186,10 @@ const App = () => {
 
         {SHOW_DEV_TOOLS && (
           <Box borderStyle="round" borderColor="gray" gap={1}>
-            <Text color="gray">
+            <Text color="white">
               {columns} x {rows}
             </Text>
-            <Text color="gray">{devMessage}</Text>
+            <Text color="white">{devMessage}</Text>
           </Box>
         )}
       </Box>
