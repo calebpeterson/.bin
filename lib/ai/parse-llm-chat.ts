@@ -26,9 +26,9 @@ export const includeFromFile: IncludeHandler = async (
 ) => {
   const fullPath = path.resolve(basePath, includePath);
   try {
-    return await fs.readFile(fullPath, "utf8");
+    return fs.readFile(fullPath, "utf8");
   } catch {
-    console.warn(`Failed to include "${includePath}"`);
+    console.warn(`Failed to read "${includePath} (${fullPath})"`);
     return "";
   }
 };
@@ -55,7 +55,7 @@ export const parseChat = async (
   const { data: meta, content } = matter(chatString);
   const lines = content.split("\n");
 
-  for (const line of lines) {
+  for await (const line of lines) {
     const trimmed = line.trim();
 
     if (trimmed.startsWith("<!-- role: ")) {
@@ -94,6 +94,24 @@ export const parseChat = async (
         );
         messages.push(...includedMessages);
       }
+    } else if (trimmed.startsWith("<!-- import: ")) {
+      // Handle imports **sequentially**
+      const importPath = trimmed
+        .replace("<!-- import: ", "")
+        .replace(" -->", "");
+      const importedContent = await includeHandler(importPath, basePath);
+
+      if (importedContent) {
+        const importedLines = importedContent.split("\n");
+
+        console.log(`Read ${importedLines.length} lines from "${importPath}"`);
+
+        currentMessage.push(...importedLines);
+      } else {
+        console.warn('No content found in "${importPath}"`');
+      }
+    } else if (trimmed.startsWith("<!-- ")) {
+      console.warn("Unhandled directive:", trimmed);
     } else {
       // Collect message content
       currentMessage.push(line);

@@ -1,7 +1,7 @@
 import matter from "gray-matter";
 import { Conversation } from "./llm-types";
 
-interface StringifyChatOptions {
+export interface StringifyChatOptions {
   model?: string;
 }
 

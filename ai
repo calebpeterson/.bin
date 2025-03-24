@@ -7,71 +7,71 @@
  */
 
 import "zx/globals";
-import OpenAI from "openai";
 import { v4 as uuid4 } from "uuid";
-import { ENV } from "./lib/read-env.mjs";
-import { choose } from "./lib/index.mjs";
-import { lines } from "./lib/lines";
 import { formatMarkdown } from "./lib/format-markdown";
 import { setTerminalTitle } from "./lib/set-terminal-title";
 import { setStatusLine } from "./lib/set-status-line";
-import { stringifyChat } from "./lib/stringify-llm-chat";
-import { parseChat } from "./lib/parse-llm-chat";
-import { ChatMessage, Conversation } from "./lib/llm-types";
+import { parseChat } from "./lib/ai/parse-llm-chat";
+import { ChatMessage, Conversation } from "./lib/ai/llm-types";
+import { generateTitle } from "./lib/ai/generate-title";
+import { chooseConversation } from "./lib/ai/choose-conversation";
+import { openai } from "./lib/ai/client";
+import { writeConversation } from "./lib/ai/write-journal";
+import { renameConversation } from "./lib/ai/rename-conversation";
+import {
+  ASSISTANT_PROMPT,
+  META_FORMAT,
+  USER_PROMPT,
+  USER_PROMPT_2,
+} from "./lib/ai/constants";
+import { completeConversation } from "./lib/ai/complete-conversation";
+import { listConversations } from "./lib/ai/list-conversations";
+import { listModels } from "./lib/ai/list-models";
 
-console.clear();
-
-const BASE_DIR = argv._[0] ?? os.homedir();
-const ROOT_DIR = `${BASE_DIR}/.ai`;
-
-let CONVERSATION_BASENAME = uuid4();
-
+const HELP_COMMAND = "/help";
 const EXIT_COMMAND = "/exit";
 const NEW_COMMAND = "/new";
 const RENAME_COMMAND = "/rename";
 const DELETE_COMMAND = "/delete";
 const COPY_COMMAND = "/copy";
 const STATUS_COMMAND = "/status";
+const AUTO_TITLE_COMMAND = "/auto-title";
+const DROP_LAST_COMMAND = "/drop-last";
+const PWD_COMMAND = "/pwd";
 
-const USER_PROMPT = chalk.blue("▸ ");
-const USER_PROMPT_2 = chalk.blue("  ");
+const HELP = {
+  [HELP_COMMAND]: "Show this help message.",
+  [EXIT_COMMAND]: "End the conversation and quit.",
+  [NEW_COMMAND]: "Start a new conversation.",
+  [RENAME_COMMAND]: "Rename the current conversation.",
+  [DELETE_COMMAND]: "Delete the current conversation and start a new one.",
+  [COPY_COMMAND]: "Copy the last message to the clipboard.",
+  [STATUS_COMMAND]: "Show the current conversation status.",
+  [AUTO_TITLE_COMMAND]: "Generate a title for the conversation.",
+  [DROP_LAST_COMMAND]:
+    "Drop the last user/assistant message pair from the conversation.",
+  [PWD_COMMAND]: "Show the current working directory.",
+};
 
-const ASSISTANT_FORMAT = chalk.blue;
-const ASSISTANT_PROMPT = ASSISTANT_FORMAT("");
+console.clear();
 
-const META_FORMAT = chalk.grey.italic;
+const ROOT_DIR = argv._[0] ?? `${os.homedir()}/.ai`;
+
+let CONVERSATION_BASENAME = uuid4();
 
 // Ensure the conversations directory exists
 await $`mkdir -p ${ROOT_DIR}`;
 
-// Create the OpenAI client
-const openai = new OpenAI({
-  organization: ENV.OPENAI_ORGANIZATION,
-  apiKey: ENV.OPENAI_API_KEY,
-});
+// List sessions
+if (argv.list) {
+  await listConversations(ROOT_DIR);
 
-const getConversationBasenames = async () =>
-  lines(await $`ls ${ROOT_DIR}`).map((filename) => path.parse(filename).name);
+  process.exit(0);
+}
 
 // List models and exit if given the --models flag
 if (argv.models) {
-  const response = await openai.models.list();
-  const models = response.data;
-  const chatModels = models.filter(
-    (model) =>
-      // All GPT models
-      model.id.includes("gpt-") &&
-      // Exclude fine-tuned models
-      !model.id.includes("ft:")
-  );
-
-  console.log("Available Chat Models:");
-
-  console.log();
-  for (const model of chatModels) {
-    console.log("  " + model.id);
-  }
-  console.log();
+  await listModels();
 
   process.exit(0);
 }
@@ -82,17 +82,9 @@ let model = argv.model ?? "gpt-4o";
 // The messages in the conversation
 const messages: Conversation = [];
 
-// Prompt the user to pick from existing conversations
-const chooseConversation = async () => {
-  const conversationBasenames = await getConversationBasenames();
-  const conversationBasename = await choose(conversationBasenames);
-
-  return conversationBasename;
-};
-
 // Continue a previous conversation?
 if (argv.continue || argv.resume) {
-  const conversationBasename = await chooseConversation();
+  const conversationBasename = await chooseConversation(ROOT_DIR);
 
   if (!conversationBasename) {
     process.exit(1);
@@ -114,16 +106,14 @@ if (argv.continue || argv.resume) {
 
   const lastMessage = messages[messages.length - 1];
 
-  // Display the last message in the conversation
+  // Display the last message of the conversation
   const lastMessageFormatted = await formatMarkdown(lastMessage.content);
   console.log(ASSISTANT_PROMPT + lastMessageFormatted + "\n");
 }
 
-setTerminalTitle(CONVERSATION_BASENAME);
-
-// Delete a previous conversation?
+// Delete a previous conversation
 if (argv.delete) {
-  const conversationBasename = await chooseConversation();
+  const conversationBasename = await chooseConversation(ROOT_DIR);
 
   if (!conversationBasename) {
     process.exit(1);
@@ -136,70 +126,19 @@ if (argv.delete) {
   process.exit(0);
 }
 
-// List sessions
-if (argv.list) {
-  const conversationBasenames = await getConversationBasenames();
-
-  console.log("Conversations:");
-
-  console.log();
-  for (const conversationBasename of conversationBasenames) {
-    console.log("  " + conversationBasename);
-  }
-  console.log();
-
-  process.exit(0);
-}
-
 // Append the message and journal the conversation
 const appendMessage = (message: ChatMessage) => {
   messages.push({ id: uuid4(), ...message });
-  fs.writeFile(
-    path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.md`),
-    stringifyChat(messages, { model }),
-    (err) => {
-      if (err) {
-        console.error(err);
-      }
-    }
-  );
+  writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, { model });
 };
 
-// Stream the response to the console
-async function streamResponse(userInput: string) {
-  appendMessage({ role: "user", content: userInput });
-
-  const stream = await openai.chat.completions.create({
-    model,
-    messages,
-    stream: true,
-  });
-
-  // Show a spinner while streaming the response
-  let buffer = "";
-  await spinner(async () => {
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content ?? "";
-      buffer += content;
-    }
-  });
-
-  process.stdout.write(`\n${ASSISTANT_PROMPT}`);
-  process.stdout.write(await formatMarkdown(buffer));
-
-  process.stdout.write("\n\n" + USER_PROMPT);
-
-  appendMessage({
-    role: "assistant",
-    content: buffer,
-  });
-}
+setTerminalTitle(CONVERSATION_BASENAME);
 
 // Welcome message
 const action = messages.length ? "resumed" : "started";
 console.log(
   META_FORMAT(
-    `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation. An empty line sends the current message buffer.\n`
+    `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation. An empty line sends the current message buffer.`
   )
 );
 
@@ -207,12 +146,21 @@ let inputBuffer = "";
 
 // Main chat loop
 while (true) {
+  console.log("");
   const input = await question(
     inputBuffer.length === 0 ? USER_PROMPT : USER_PROMPT_2
   );
 
   if (input.toLowerCase() === ".exit") {
     console.log(META_FORMAT(`Did you mean ${EXIT_COMMAND}?`));
+    continue;
+  }
+
+  if (input.toLowerCase() === HELP_COMMAND) {
+    console.log("Available commands:");
+    for (const [command, description] of Object.entries(HELP)) {
+      console.log(`  ${command.padEnd(15)} ${description}`);
+    }
     continue;
   }
 
@@ -237,29 +185,44 @@ while (true) {
     process.exit(0);
   }
 
-  if (input.startsWith(COPY_COMMAND)) {
+  if (input.toLowerCase().startsWith(COPY_COMMAND)) {
     await $`echo ${messages[messages.length - 1].content} | pbcopy`;
     console.log(META_FORMAT(`Copied last message to clipboard.`));
 
     continue;
   }
 
-  if (input.startsWith(RENAME_COMMAND)) {
+  if (input.toLowerCase().startsWith(RENAME_COMMAND)) {
     const newName = input.slice(RENAME_COMMAND.length).trim();
-    const oldPath = path.join(ROOT_DIR, `${CONVERSATION_BASENAME}.md`);
-    const newPath = path.join(ROOT_DIR, `${newName}.md`);
 
-    await fs.rename(oldPath, newPath);
+    if (newName) {
+      await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
 
-    console.log(META_FORMAT(`Renamed conversation to "${newName}"`));
-
-    CONVERSATION_BASENAME = newName;
-    setTerminalTitle(CONVERSATION_BASENAME);
+      CONVERSATION_BASENAME = newName;
+    } else {
+      console.log(
+        META_FORMAT(`No name provided. Usage: ${RENAME_COMMAND} <name>`)
+      );
+    }
 
     continue;
   }
 
-  if (input.startsWith(DELETE_COMMAND)) {
+  if (input.toLowerCase() === AUTO_TITLE_COMMAND) {
+    const newName = await generateTitle(model, messages);
+
+    if (newName) {
+      await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
+
+      CONVERSATION_BASENAME = newName;
+    } else {
+      console.log(META_FORMAT(`No title suggested.`));
+    }
+
+    continue;
+  }
+
+  if (input.toLowerCase().startsWith(DELETE_COMMAND)) {
     console.clear();
 
     // Clean up the conversation file
@@ -273,7 +236,34 @@ while (true) {
     CONVERSATION_BASENAME = uuid4();
     setTerminalTitle(CONVERSATION_BASENAME);
     console.log(META_FORMAT(`Started a new conversation with ${model}.`));
+    console.log("");
 
+    continue;
+  }
+
+  if (input.toLowerCase() === DROP_LAST_COMMAND) {
+    if (messages.length < 2) {
+      console.log(META_FORMAT(`No messages to drop.`));
+    } else {
+      // Remove the last assistant message
+      messages.pop();
+      // Remove the last user message
+      messages.pop();
+
+      writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, { model });
+      console.log(META_FORMAT(`Dropped last message.`));
+    }
+
+    continue;
+  }
+
+  if (input.toLowerCase() === PWD_COMMAND) {
+    console.log(META_FORMAT(`Current working directory: ${ROOT_DIR}`));
+    continue;
+  }
+
+  if (input.startsWith("/")) {
+    console.log(META_FORMAT(`Unknown command: ${input}`));
     continue;
   }
 
@@ -281,10 +271,18 @@ while (true) {
   if (input.length !== 0) {
     inputBuffer += input;
     setStatusLine("Press ENTER again to send the message.");
+
     continue;
   }
 
-  await streamResponse(inputBuffer);
+  appendMessage({ role: "user", content: inputBuffer });
+
+  const response = await completeConversation(model, messages);
+
+  appendMessage({
+    role: "assistant",
+    content: response,
+  });
 
   inputBuffer = "";
   setStatusLine("");
