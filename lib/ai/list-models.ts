@@ -11,11 +11,13 @@ export const listModels = async () => {
       !model.id.includes("ft:")
   );
 
+  const modelIds = chatModels.map((model) => model.id).sort();
+
   console.log("Available Chat Models:");
 
   console.log();
-  for (const model of chatModels) {
-    console.log("  " + model.id);
+  for (const modelId of modelIds) {
+    console.log("  " + modelId);
   }
   console.log();
 };

@@ -1,13 +1,13 @@
 import { Conversation } from "./llm-types";
 import { stringifyChat, StringifyChatOptions } from "./stringify-llm-chat";
 
-export const writeConversation = (
+export const writeConversation = async (
   rootDir: string,
   conversationBasename: string,
   messages: Conversation,
   options: StringifyChatOptions
 ) => {
-  fs.writeFile(
+  await fs.writeFile(
     path.join(rootDir, `${conversationBasename}.md`),
     stringifyChat(messages, options),
     (err) => {

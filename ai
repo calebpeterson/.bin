@@ -26,6 +26,9 @@ import {
 import { completeConversation } from "./lib/ai/complete-conversation";
 import { listConversations } from "./lib/ai/list-conversations";
 import { listModels } from "./lib/ai/list-models";
+import { estimateReadingTime } from "./lib/ai/estimate-reading-time";
+import { countWords } from "./lib/ai/count-words";
+import { withDefaultExtension } from "./lib/with-default-extension";
 
 const HELP_COMMAND = "/help";
 const EXIT_COMMAND = "/exit";
@@ -140,9 +143,22 @@ if (argv.complete) {
     },
   ];
 
+  const wordCount = countWords(response);
+  const estimatedReadingTime = estimateReadingTime(response);
+  console.log(
+    META_FORMAT(
+      `\n\nEstimated reading time: ${estimatedReadingTime} minutes (${wordCount} words)`
+    )
+  );
+
   const target = argv.target;
   if (target) {
-    writeConversation(ROOT_DIR, target, completed, { model });
+    await writeConversation(ROOT_DIR, target, completed, { model });
+  }
+
+  const output = argv.output;
+  if (output) {
+    await fs.writeFile(withDefaultExtension(output, ".md"), response, "utf8");
   }
 
   process.exit(0);
