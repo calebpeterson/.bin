@@ -79,6 +79,7 @@ if (argv.models) {
 }
 
 // The LLM model to use
+let provider = argv.provider ?? "openai";
 let model = argv.model ?? "gpt-4o";
 
 // The messages in the conversation

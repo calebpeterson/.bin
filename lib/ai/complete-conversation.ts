@@ -1,5 +1,5 @@
 import { formatMarkdown } from "../format-markdown";
-import { openai } from "./client";
+import { getClient } from "./client";
 import { ASSISTANT_PROMPT } from "./constants";
 import { Conversation } from "./llm-types";
 
@@ -8,7 +8,8 @@ export async function completeConversation(
   model: string,
   messages: Conversation
 ) {
-  const stream = await openai.chat.completions.create({
+  const client = getClient(model);
+  const stream = await client.chat.completions.create({
     model,
     messages,
     stream: true,

@@ -1,6 +1,11 @@
-import { openai } from "./client";
+import { anthropic, openai } from "./client";
 
 export const listModels = async () => {
+  logModels(await getModelsForOpenAI(), "OpenAI");
+  logModels(await getModelsForAnthropic(), "Anthropic");
+};
+
+const getModelsForOpenAI = async () => {
   const response = await openai.models.list();
   const models = response.data;
   const chatModels = models.filter(
@@ -13,7 +18,24 @@ export const listModels = async () => {
 
   const modelIds = chatModels.map((model) => model.id).sort();
 
-  console.log("Available Chat Models:");
+  return modelIds;
+};
+
+const getModelsForAnthropic = async () => {
+  const response = await anthropic.models.list();
+  const models = response.data;
+  const chatModels = models.filter((model) =>
+    // All Claude models
+    model.id.includes("claude-")
+  );
+
+  const modelIds = chatModels.map((model) => model.id).sort();
+
+  return modelIds;
+};
+
+const logModels = (modelIds: string[], platform: string) => {
+  console.log(`Available ${platform} Chat Models:`);
 
   console.log();
   for (const modelId of modelIds) {
