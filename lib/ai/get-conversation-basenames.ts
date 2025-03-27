@@ -1,3 +1,4 @@
+import "zx/globals";
 import { lines } from "../lines";
 
 export const getConversationBasenames = async (rootDir: string) =>

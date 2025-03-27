@@ -1,8 +1,9 @@
 import { Conversation } from "./llm-types";
-import { openai } from "./client";
+import { getClientForProvider } from "./client";
 
 export async function generateTitle(model: string, messages: Conversation) {
-  const response = await openai.chat.completions.create({
+  const client = getClientForProvider("openai");
+  const response = await client.chat.completions.create({
     model,
     messages: [
       ...messages,

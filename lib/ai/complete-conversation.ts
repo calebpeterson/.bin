@@ -1,5 +1,5 @@
 import { formatMarkdown } from "../format-markdown";
-import { getClient } from "./client";
+import { getClientForModel } from "./client";
 import { ASSISTANT_PROMPT } from "./constants";
 import { Conversation } from "./llm-types";
 
@@ -8,7 +8,7 @@ export async function completeConversation(
   model: string,
   messages: Conversation
 ) {
-  const client = getClient(model);
+  const client = getClientForModel(model);
   const stream = await client.chat.completions.create({
     model,
     messages,

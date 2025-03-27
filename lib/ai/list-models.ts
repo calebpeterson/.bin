@@ -1,4 +1,4 @@
-import { anthropic, openai } from "./client";
+import { getClientForProvider } from "./client";
 
 export const listModels = async () => {
   logModels(await getModelsForOpenAI(), "OpenAI");
@@ -6,7 +6,8 @@ export const listModels = async () => {
 };
 
 const getModelsForOpenAI = async () => {
-  const response = await openai.models.list();
+  const client = getClientForProvider("openai");
+  const response = await client.models.list();
   const models = response.data;
   const chatModels = models.filter(
     (model) =>
@@ -22,7 +23,8 @@ const getModelsForOpenAI = async () => {
 };
 
 const getModelsForAnthropic = async () => {
-  const response = await anthropic.models.list();
+  const client = getClientForProvider("anthropic");
+  const response = await client.models.list();
   const models = response.data;
   const chatModels = models.filter((model) =>
     // All Claude models
