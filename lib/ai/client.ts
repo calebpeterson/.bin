@@ -50,5 +50,5 @@ export const getClientForModel = (model: string) => {
     return anthropicBraintrust;
   }
 
-  return openai;
+  return getClientForProvider("openai");
 };

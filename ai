@@ -10,7 +10,6 @@ import "zx/globals";
 import { v4 as uuid4 } from "uuid";
 import { formatMarkdown } from "./lib/format-markdown";
 import { setTerminalTitle } from "./lib/set-terminal-title";
-import { setStatusLine } from "./lib/set-status-line";
 import { parseChat } from "./lib/ai/parse-llm-chat";
 import { ChatMessage, Conversation } from "./lib/ai/llm-types";
 import { generateTitle } from "./lib/ai/generate-title";
@@ -323,10 +322,12 @@ while (true) {
   // Non-empty lines are appended to the current message
   if (input.length !== 0) {
     inputBuffer += input;
-    setStatusLine("Press ENTER again to send the message.");
+    setTerminalTitle("Press ENTER again to send the message.");
 
     continue;
   }
+
+  setTerminalTitle(CONVERSATION_BASENAME);
 
   appendMessage({ role: "user", content: inputBuffer });
 
@@ -338,5 +339,4 @@ while (true) {
   });
 
   inputBuffer = "";
-  setStatusLine("");
 }
