@@ -1,11 +1,5 @@
 #!/usr/bin/env bun
 
-/*
- * TODO:
- *
- * Inject selection + prompt into a new session
- */
-
 import "zx/globals";
 import { v4 as uuid4 } from "uuid";
 import { formatMarkdown } from "./lib/format-markdown";
