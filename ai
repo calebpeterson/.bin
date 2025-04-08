@@ -316,7 +316,7 @@ while (true) {
   // Non-empty lines are appended to the current message
   if (input.length !== 0) {
     inputBuffer += input;
-    setTerminalTitle("Press ENTER again to send the message.");
+    setTerminalTitle("Press ENTER again to send the message.", { bell: true });
 
     continue;
   }

@@ -29,3 +29,4 @@ checkDirectory(TOOLS_DIR, "quickulator");
 checkDirectory(TOOLS_DIR, "meta-x");
 
 await checkCommand("bun");
+await checkCommand("delta");
