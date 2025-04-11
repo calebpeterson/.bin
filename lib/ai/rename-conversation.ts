@@ -9,6 +9,16 @@ export const renameConversation = async (
   const oldPath = path.join(rootDir, `${oldName}.md`);
   const newPath = path.join(rootDir, `${newName}.md`);
 
+  if (!(await fs.exists(oldPath))) {
+    console.log(META_FORMAT(`Conversation "${oldName}" does not exist.`));
+    return;
+  }
+
+  if (await fs.exists(newPath)) {
+    console.log(META_FORMAT(`Conversation "${newName}" already exists.`));
+    return;
+  }
+
   await fs.rename(oldPath, newPath);
 
   console.log(META_FORMAT(`Renamed conversation to "${newName}"`));

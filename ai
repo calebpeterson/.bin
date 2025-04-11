@@ -1,26 +1,26 @@
 #!/usr/bin/env bun
 
-import "zx/globals";
 import { v4 as uuid4 } from "uuid";
-import { formatMarkdown } from "./lib/format-markdown";
-import { setTerminalTitle } from "./lib/set-terminal-title";
-import { parseChat } from "./lib/ai/parse-llm-chat";
-import { ChatMessage, Conversation } from "./lib/ai/llm-types";
-import { generateTitle } from "./lib/ai/generate-title";
+import "zx/globals";
 import { chooseConversation } from "./lib/ai/choose-conversation";
-import { writeConversation } from "./lib/ai/write-journal";
-import { renameConversation } from "./lib/ai/rename-conversation";
+import { completeConversation } from "./lib/ai/complete-conversation";
 import {
   ASSISTANT_PROMPT,
   META_FORMAT,
   USER_PROMPT,
   USER_PROMPT_2,
 } from "./lib/ai/constants";
-import { completeConversation } from "./lib/ai/complete-conversation";
+import { countWords } from "./lib/ai/count-words";
+import { estimateReadingTime } from "./lib/ai/estimate-reading-time";
+import { generateTitle } from "./lib/ai/generate-title";
 import { listConversations } from "./lib/ai/list-conversations";
 import { listModels } from "./lib/ai/list-models";
-import { estimateReadingTime } from "./lib/ai/estimate-reading-time";
-import { countWords } from "./lib/ai/count-words";
+import { ChatMessage, Conversation } from "./lib/ai/llm-types";
+import { parseChat } from "./lib/ai/parse-llm-chat";
+import { renameConversation } from "./lib/ai/rename-conversation";
+import { writeConversation } from "./lib/ai/write-journal";
+import { formatMarkdown } from "./lib/format-markdown";
+import { setTerminalTitle } from "./lib/set-terminal-title";
 import { withDefaultExtension } from "./lib/with-default-extension";
 
 const HELP_COMMAND = "/help";
@@ -46,6 +46,93 @@ const HELP = {
   [DROP_LAST_COMMAND]:
     "Drop the last user/assistant message pair from the conversation.",
   [PWD_COMMAND]: "Show the current working directory.",
+};
+
+const COMMANDS = {
+  [HELP_COMMAND]: async (input: string) => {
+    console.log("Available commands:");
+    for (const [command, description] of Object.entries(HELP)) {
+      console.log(`  ${command.padEnd(15)} ${description}`);
+    }
+  },
+
+  [NEW_COMMAND]: async (input: string) => {
+    console.clear();
+    messages.length = 0;
+    CONVERSATION_BASENAME = uuid4();
+    setTerminalTitle(CONVERSATION_BASENAME);
+    console.log(META_FORMAT(`Started a new conversation with ${model}.`));
+  },
+
+  [STATUS_COMMAND]: async (input: string) => {
+    console.log(META_FORMAT(`Conversation: ${CONVERSATION_BASENAME}`));
+    console.log(META_FORMAT(`Model:        ${model}`));
+    console.log(META_FORMAT(`Messages:     ${messages.length}`));
+  },
+
+  [EXIT_COMMAND]: async (input: string) => {
+    console.clear();
+    process.exit(0);
+  },
+
+  [COPY_COMMAND]: async (input: string) => {
+    await $`echo ${messages[messages.length - 1].content} | pbcopy`;
+    console.log(META_FORMAT(`Copied last message to clipboard.`));
+  },
+
+  [RENAME_COMMAND]: async (input: string) => {
+    const newName = input.slice(RENAME_COMMAND.length).trim();
+
+    if (newName) {
+      await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
+      CONVERSATION_BASENAME = newName;
+    } else {
+      console.log(
+        META_FORMAT(`No name provided. Usage: ${RENAME_COMMAND} <name>`)
+      );
+    }
+  },
+
+  [AUTO_NAME_COMMAND]: async (input: string) => {
+    const newName = await generateTitle(model, messages);
+
+    if (newName) {
+      await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
+      CONVERSATION_BASENAME = newName;
+    } else {
+      console.log(META_FORMAT(`No name suggested.`));
+    }
+  },
+
+  [DELETE_COMMAND]: async (input: string) => {
+    console.clear();
+
+    await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.md`;
+    console.log(META_FORMAT(`Deleted conversation "${CONVERSATION_BASENAME}"`));
+
+    messages.length = 0;
+    CONVERSATION_BASENAME = uuid4();
+
+    setTerminalTitle(CONVERSATION_BASENAME);
+
+    console.log(META_FORMAT(`Started a new conversation with ${model}.`));
+  },
+
+  [DROP_LAST_COMMAND]: async (input: string) => {
+    if (messages.length < 2) {
+      console.log(META_FORMAT(`No messages to drop.`));
+    } else {
+      messages.pop();
+      messages.pop();
+
+      writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, { model });
+      console.log(META_FORMAT(`Dropped last message.`));
+    }
+  },
+
+  [PWD_COMMAND]: async (input: string) => {
+    console.log(META_FORMAT(`Current working directory: ${ROOT_DIR}`));
+  },
 };
 
 console.clear();
@@ -203,108 +290,9 @@ while (true) {
     continue;
   }
 
-  if (input.toLowerCase() === HELP_COMMAND) {
-    console.log("Available commands:");
-    for (const [command, description] of Object.entries(HELP)) {
-      console.log(`  ${command.padEnd(15)} ${description}`);
-    }
-    continue;
-  }
-
-  if (input.toLowerCase() === NEW_COMMAND) {
-    console.clear();
-    messages.length = 0;
-    CONVERSATION_BASENAME = uuid4();
-    setTerminalTitle(CONVERSATION_BASENAME);
-    console.log(META_FORMAT(`Started a new conversation with ${model}.`));
-    continue;
-  }
-
-  if (input.toLowerCase() === STATUS_COMMAND) {
-    console.log(META_FORMAT(`Conversation: ${CONVERSATION_BASENAME}`));
-    console.log(META_FORMAT(`Model:        ${model}`));
-    console.log(META_FORMAT(`Messages:     ${messages.length}`));
-    continue;
-  }
-
-  if (input.toLowerCase() === EXIT_COMMAND) {
-    console.clear();
-    process.exit(0);
-  }
-
-  if (input.toLowerCase().startsWith(COPY_COMMAND)) {
-    await $`echo ${messages[messages.length - 1].content} | pbcopy`;
-    console.log(META_FORMAT(`Copied last message to clipboard.`));
-
-    continue;
-  }
-
-  if (input.toLowerCase().startsWith(RENAME_COMMAND)) {
-    const newName = input.slice(RENAME_COMMAND.length).trim();
-
-    if (newName) {
-      await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
-
-      CONVERSATION_BASENAME = newName;
-    } else {
-      console.log(
-        META_FORMAT(`No name provided. Usage: ${RENAME_COMMAND} <name>`)
-      );
-    }
-
-    continue;
-  }
-
-  if (input.toLowerCase() === AUTO_NAME_COMMAND) {
-    const newName = await generateTitle(model, messages);
-
-    if (newName) {
-      await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
-
-      CONVERSATION_BASENAME = newName;
-    } else {
-      console.log(META_FORMAT(`No name suggested.`));
-    }
-
-    continue;
-  }
-
-  if (input.toLowerCase().startsWith(DELETE_COMMAND)) {
-    console.clear();
-
-    // Clean up the conversation file
-    await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.md`;
-    console.log(META_FORMAT(`Deleted conversation "${CONVERSATION_BASENAME}"`));
-
-    // Clear the messages
-    messages.length = 0;
-
-    // Start a new conversation
-    CONVERSATION_BASENAME = uuid4();
-    setTerminalTitle(CONVERSATION_BASENAME);
-    console.log(META_FORMAT(`Started a new conversation with ${model}.`));
-
-    continue;
-  }
-
-  if (input.toLowerCase() === DROP_LAST_COMMAND) {
-    if (messages.length < 2) {
-      console.log(META_FORMAT(`No messages to drop.`));
-    } else {
-      // Remove the last assistant message
-      messages.pop();
-      // Remove the last user message
-      messages.pop();
-
-      writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, { model });
-      console.log(META_FORMAT(`Dropped last message.`));
-    }
-
-    continue;
-  }
-
-  if (input.toLowerCase() === PWD_COMMAND) {
-    console.log(META_FORMAT(`Current working directory: ${ROOT_DIR}`));
+  const [command] = input.toLowerCase().split(" ");
+  if (command in COMMANDS) {
+    await COMMANDS[command](input);
     continue;
   }
 
@@ -317,7 +305,6 @@ while (true) {
   if (input.length !== 0) {
     inputBuffer += input;
     setTerminalTitle("Press ENTER again to send the message.", { bell: true });
-
     continue;
   }
 
