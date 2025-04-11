@@ -1,0 +1,12 @@
+#!/usr/bin/env bun
+
+import "zx/globals";
+import { ensureExtension } from "./lib/ensure-extension";
+import { formatMarkdown } from "./lib/format-markdown";
+
+const filename = ensureExtension(argv._[0], ".md");
+
+const content = await fs.readFile(filename, "utf8");
+
+console.clear();
+console.log(await formatMarkdown(content));
