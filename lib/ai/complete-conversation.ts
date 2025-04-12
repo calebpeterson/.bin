@@ -1,4 +1,5 @@
 import { formatMarkdown } from "../format-markdown";
+import { hr } from "../horizontal-rule";
 import { getClientForModel } from "./client";
 import { ASSISTANT_PROMPT } from "./constants";
 import { Conversation } from "./llm-types";
@@ -8,6 +9,8 @@ export async function completeConversation(
   model: string,
   messages: Conversation
 ) {
+  hr();
+
   const client = getClientForModel(model);
   const stream = await client.chat.completions.create({
     model,
@@ -24,8 +27,9 @@ export async function completeConversation(
     }
   });
 
-  process.stdout.write(`\n${ASSISTANT_PROMPT}`);
+  process.stdout.write(`${ASSISTANT_PROMPT}`);
   process.stdout.write(await formatMarkdown(buffer));
+  process.stdout.write("\n");
 
   return buffer;
 }

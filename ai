@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { isEmpty, trim } from "lodash";
+import { isEmpty, isString, trim } from "lodash";
 import { v4 as uuid4 } from "uuid";
 import "zx/globals";
 import { chooseConversation } from "./lib/ai/choose-conversation";
@@ -22,6 +22,7 @@ import { renameConversation } from "./lib/ai/rename-conversation";
 import { SlashCommand } from "./lib/ai/types";
 import { writeConversation } from "./lib/ai/write-journal";
 import { formatMarkdown } from "./lib/format-markdown";
+import { hr } from "./lib/horizontal-rule";
 import { setTerminalTitle } from "./lib/set-terminal-title";
 import { withDefaultExtension } from "./lib/with-default-extension";
 
@@ -148,9 +149,10 @@ if (argv.continue || argv.resume) {
   const basenameFromCommand = argv.continue ?? argv.resume;
 
   // Otherwise prompt the user to choose from conversations in the ROOT_DIR
-  const conversationBasename = !isEmpty(trim(basenameFromCommand))
-    ? basenameFromCommand
-    : await chooseConversation(ROOT_DIR);
+  const conversationBasename =
+    isString(basenameFromCommand) && !isEmpty(trim(basenameFromCommand))
+      ? basenameFromCommand
+      : await chooseConversation(ROOT_DIR);
 
   if (!conversationBasename) {
     process.exit(1);
@@ -177,7 +179,8 @@ if (argv.continue || argv.resume) {
   if (lastMessage.role === "assistant") {
     // Display the last message of the conversation
     const lastMessageFormatted = await formatMarkdown(lastMessage.content);
-    console.log(ASSISTANT_PROMPT + lastMessageFormatted + "\n");
+    hr();
+    console.log(ASSISTANT_PROMPT + lastMessageFormatted);
   } else {
     const response = await completeConversation(model, messages);
 
@@ -193,20 +196,22 @@ if (argv.continue || argv.resume) {
 setTerminalTitle(CONVERSATION_BASENAME);
 
 // Welcome message
+hr();
 const action = messages.length ? "resumed" : "started";
 console.log(
   META_FORMAT(
     `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation. An empty line sends the current message buffer.`
   )
 );
+hr();
 
 const SLASH_COMMANDS: Record<string, SlashCommand> = {
   [HELP_COMMAND]: {
     help: "Show this help message.",
     run: async (input: string) => {
-      console.log("Available commands:");
+      console.log(chalk.grey("Available commands:"));
       for (const [command, { help }] of Object.entries(SLASH_COMMANDS)) {
-        console.log(`  ${command.padEnd(15)} ${help}`);
+        console.log(chalk.grey(`  ${command.padEnd(15)} ${help}`));
       }
     },
   },
@@ -350,19 +355,20 @@ let inputBuffer = "";
 
 // Main chat loop
 while (true) {
-  console.log("");
+  if (inputBuffer.length === 0) {
+    console.log("");
+  }
+
   const input = await question(
     inputBuffer.length === 0 ? USER_PROMPT : USER_PROMPT_2
   );
 
-  if (input.toLowerCase() === ".exit") {
-    console.log(META_FORMAT(`Did you mean ${EXIT_COMMAND}?`));
-    continue;
-  }
-
   const [command] = input.toLowerCase().split(" ");
   if (command in SLASH_COMMANDS) {
+    console.log("");
+    hr();
     await SLASH_COMMANDS[command].run(input);
+    hr();
     continue;
   }
 
@@ -390,4 +396,6 @@ while (true) {
   });
 
   inputBuffer = "";
+
+  hr();
 }
