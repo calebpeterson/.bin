@@ -247,7 +247,8 @@ const SLASH_COMMANDS: Record<string, SlashCommand> = {
   [COPY_COMMAND]: {
     help: "Copy the last message to the clipboard.",
     run: async (input: string) => {
-      await $`echo ${messages[messages.length - 1].content} | pbcopy`;
+      const lastMessage = messages[messages.length - 1];
+      await $`echo ${lastMessage.content} | pbcopy`;
       console.log(META_FORMAT(`Copied last message to clipboard.`));
     },
   },
@@ -310,7 +311,10 @@ const SLASH_COMMANDS: Record<string, SlashCommand> = {
         messages.pop();
         messages.pop();
 
-        writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, { model });
+        await writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, {
+          model,
+        });
+
         console.log(META_FORMAT(`Dropped last message.`));
       }
     },
