@@ -88,7 +88,7 @@ if (argv.complete) {
 
   const response = await completeConversation(model, messages);
 
-  const completed = [
+  const completed: Conversation = [
     ...messages,
     {
       role: "assistant",

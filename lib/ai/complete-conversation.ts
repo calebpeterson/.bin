@@ -1,6 +1,7 @@
+import { generateText } from "ai";
 import { formatMarkdown } from "../format-markdown";
 import { hr } from "../horizontal-rule";
-import { getClientForModel } from "./client";
+import { getAiSdkModel } from "./ai-sdk";
 import { ASSISTANT_PROMPT } from "./constants";
 import { Conversation } from "./llm-types";
 
@@ -11,20 +12,15 @@ export async function completeConversation(
 ) {
   hr();
 
-  const client = getClientForModel(model);
-  const stream = await client.chat.completions.create({
-    model,
-    messages,
-    stream: true,
-  });
-
   // Show a spinner while streaming the response
   let buffer = "";
   await spinner(async () => {
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content ?? "";
-      buffer += content;
-    }
+    const { text } = await generateText({
+      model: getAiSdkModel(model),
+      messages,
+    });
+
+    buffer = text;
   });
 
   process.stdout.write(`${ASSISTANT_PROMPT}`);

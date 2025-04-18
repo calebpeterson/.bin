@@ -1,4 +1,4 @@
-import { getClientForProvider } from "./client";
+import { getClientForProvider } from "./ai-client";
 
 export const listModels = async () => {
   logModels(await getModelsForOpenAI(), "OpenAI");
