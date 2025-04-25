@@ -1,3 +1,5 @@
+import path from "path";
+import "zx/globals";
 import { Conversation } from "./llm-types";
 import { stringifyChat, StringifyChatOptions } from "./stringify-llm-chat";
 

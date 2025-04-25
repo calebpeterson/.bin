@@ -3,6 +3,20 @@
 import { isEmpty, isString, trim } from "lodash";
 import { v4 as uuid4 } from "uuid";
 import "zx/globals";
+import { autoNameCommand } from "./lib/ai/actions/auto-name-command";
+import { copyLastMessageCommand } from "./lib/ai/actions/copy-command";
+import { deleteCommand } from "./lib/ai/actions/delete-command";
+import { dropLastMessageCommand } from "./lib/ai/actions/drop-last-command";
+import { exitCommand } from "./lib/ai/actions/exit-command";
+import { newConversationCommand } from "./lib/ai/actions/new-command";
+import { pwdCommand } from "./lib/ai/actions/pwd-command";
+import { RENAME_COMMAND, renameCommand } from "./lib/ai/actions/rename-command";
+import { statusCommand } from "./lib/ai/actions/status-command";
+import {
+  WRITE_LAST_COMMAND,
+  writeLastMessageCommand,
+} from "./lib/ai/actions/write-last-command";
+import { appendMessage } from "./lib/ai/append-message";
 import { chooseConversation } from "./lib/ai/choose-conversation";
 import { completeConversation } from "./lib/ai/complete-conversation";
 import {
@@ -13,14 +27,18 @@ import {
 } from "./lib/ai/constants";
 import { countWords } from "./lib/ai/count-words";
 import { estimateReadingTime } from "./lib/ai/estimate-reading-time";
-import { generateTitle } from "./lib/ai/generate-title";
 import { listConversations } from "./lib/ai/list-conversations";
 import { listModels } from "./lib/ai/list-models";
-import { ChatMessage, Conversation } from "./lib/ai/llm-types";
+import { Conversation } from "./lib/ai/llm-types";
 import { parseChat } from "./lib/ai/parse-llm-chat";
-import { renameConversation } from "./lib/ai/rename-conversation";
-import { SlashCommand } from "./lib/ai/types";
-import { writeConversation } from "./lib/ai/write-journal";
+import {
+  selectInteractiveAction,
+  selectModel,
+  selectTerminalTitle,
+} from "./lib/ai/selectors";
+import { Store } from "./lib/ai/store";
+import { SlashCommand, State } from "./lib/ai/types";
+import { writeConversation } from "./lib/ai/write-conversation";
 import { formatMarkdown } from "./lib/format-markdown";
 import { hr } from "./lib/horizontal-rule";
 import { setTerminalTitle } from "./lib/set-terminal-title";
@@ -29,18 +47,21 @@ import { withDefaultExtension } from "./lib/with-default-extension";
 const HELP_COMMAND = "/help";
 const EXIT_COMMAND = "/exit";
 const NEW_COMMAND = "/new";
-const RENAME_COMMAND = "/rename";
 const DELETE_COMMAND = "/delete";
 const COPY_COMMAND = "/copy";
 const STATUS_COMMAND = "/status";
 const AUTO_NAME_COMMAND = "/auto-name";
 const DROP_LAST_COMMAND = "/drop-last";
-const WRITE_LAST_COMMAND = "/write-last";
 const PWD_COMMAND = "/pwd";
 
 const ROOT_DIR = argv._[0] ?? `${os.homedir()}/.ai`;
 
-let CONVERSATION_BASENAME = uuid4();
+const store = new Store<State>({
+  ROOT_DIR,
+  CONVERSATION_BASENAME: uuid4(),
+  model: argv.model ?? "gpt-4o",
+  messages: [],
+});
 
 // Ensure the conversations directory exists
 await $`mkdir -p ${ROOT_DIR}`;
@@ -59,13 +80,6 @@ if (argv.models) {
   process.exit(0);
 }
 
-// The LLM model to use
-let provider = argv.provider ?? "openai";
-let model = argv.model ?? "gpt-4o";
-
-// The messages in the conversation
-const messages: Conversation = [];
-
 if (argv.complete) {
   const conversationBasename = argv.complete;
 
@@ -77,14 +91,12 @@ if (argv.complete) {
   }
 
   const content = await fs.readFile(
-    path.join(ROOT_DIR, conversationBasename + ".md"),
+    path.join(store.get("ROOT_DIR"), conversationBasename + ".md"),
     "utf8"
   );
   const { meta, messages } = await parseChat(content);
 
-  if ("model" in meta) {
-    model = meta.model;
-  }
+  const model = "model" in meta ? (meta.model as string) : "gpt-4o";
 
   const response = await completeConversation(model, messages);
 
@@ -107,7 +119,9 @@ if (argv.complete) {
   // Write the entire conversation to file
   const target = argv.target;
   if (target) {
-    await writeConversation(ROOT_DIR, target, completed, { model });
+    await writeConversation(store.get("ROOT_DIR"), target, completed, {
+      model: store.get("model"),
+    });
   }
 
   // Output only the last response to file
@@ -137,12 +151,6 @@ if (argv.delete) {
 // Clear the console for interactive use
 console.clear();
 
-// Append the message and journal the conversation
-const appendMessage = (message: ChatMessage) => {
-  messages.push({ id: uuid4(), ...message });
-  writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, { model });
-};
-
 // Continue a previous conversation?
 if (argv.continue || argv.resume) {
   // If the user provided a filename, continue from that file
@@ -160,21 +168,21 @@ if (argv.continue || argv.resume) {
 
   console.log(META_FORMAT(`Continuing from "${conversationBasename}".`));
 
-  CONVERSATION_BASENAME = argv.target ?? conversationBasename;
+  store.set("CONVERSATION_BASENAME", argv.target ?? conversationBasename);
 
   const content = await fs.readFile(
-    path.join(ROOT_DIR, conversationBasename + ".md"),
+    path.join(store.get("ROOT_DIR"), conversationBasename + ".md"),
     "utf8"
   );
   const { meta, messages: history } = await parseChat(content);
 
   if ("model" in meta) {
-    model = meta.model;
+    store.set("model", meta.model as string);
   }
 
-  messages.push(...history);
+  store.set("messages", [...history]);
 
-  const lastMessage = messages[messages.length - 1];
+  const lastMessage = history[history.length - 1];
 
   if (lastMessage.role === "assistant") {
     // Display the last message of the conversation
@@ -182,9 +190,10 @@ if (argv.continue || argv.resume) {
     hr();
     console.log(ASSISTANT_PROMPT + lastMessageFormatted);
   } else {
-    const response = await completeConversation(model, messages);
+    const state = store.getState();
+    const response = await completeConversation(state.model, state.messages);
 
-    appendMessage({
+    await appendMessage(store, {
       role: "assistant",
       content: response,
     });
@@ -193,14 +202,16 @@ if (argv.continue || argv.resume) {
   }
 }
 
-setTerminalTitle(CONVERSATION_BASENAME);
+setTerminalTitle(selectTerminalTitle(store.getState()));
 
 // Welcome message
 hr();
-const action = messages.length ? "resumed" : "started";
+const action = selectInteractiveAction(store);
 console.log(
   META_FORMAT(
-    `Chat with ${model} ${action}. Type '${EXIT_COMMAND}' to end the conversation. An empty line sends the current message buffer.`
+    `Chat with ${selectModel(
+      store.getState()
+    )} ${action}. Type '${EXIT_COMMAND}' to end the conversation. An empty line sends the current message buffer.`
   )
 );
 hr();
@@ -208,8 +219,9 @@ hr();
 const SLASH_COMMANDS: Record<string, SlashCommand> = {
   [HELP_COMMAND]: {
     help: "Show this help message.",
-    run: async (input: string) => {
+    run: async (_input: string) => {
       console.log(chalk.grey("Available commands:"));
+
       for (const [command, { help }] of Object.entries(SLASH_COMMANDS)) {
         console.log(chalk.grey(`  ${command.padEnd(15)} ${help}`));
       }
@@ -218,38 +230,29 @@ const SLASH_COMMANDS: Record<string, SlashCommand> = {
 
   [NEW_COMMAND]: {
     help: "Start a new conversation.",
-    run: async (input: string) => {
-      console.clear();
-      messages.length = 0;
-      CONVERSATION_BASENAME = uuid4();
-      setTerminalTitle(CONVERSATION_BASENAME);
-      console.log(META_FORMAT(`Started a new conversation with ${model}.`));
+    run: async (_input: string) => {
+      await store.execute(newConversationCommand);
     },
   },
 
   [STATUS_COMMAND]: {
     help: "Show the current conversation status.",
-    run: async (input: string) => {
-      console.log(META_FORMAT(`Conversation: ${CONVERSATION_BASENAME}`));
-      console.log(META_FORMAT(`Model:        ${model}`));
-      console.log(META_FORMAT(`Messages:     ${messages.length}`));
+    run: async (_input: string) => {
+      await store.execute(statusCommand);
     },
   },
 
   [EXIT_COMMAND]: {
     help: "End the conversation and quit.",
-    run: async (input: string) => {
-      console.clear();
-      process.exit(0);
+    run: async (_input: string) => {
+      await store.execute(exitCommand);
     },
   },
 
   [COPY_COMMAND]: {
     help: "Copy the last message to the clipboard.",
-    run: async (input: string) => {
-      const lastMessage = messages[messages.length - 1];
-      await $`echo ${lastMessage.content} | pbcopy`;
-      console.log(META_FORMAT(`Copied last message to clipboard.`));
+    run: async (_input: string) => {
+      await store.execute(copyLastMessageCommand);
     },
   },
 
@@ -257,100 +260,43 @@ const SLASH_COMMANDS: Record<string, SlashCommand> = {
     help: "Rename the current conversation.",
     run: async (input: string) => {
       const newName = input.slice(RENAME_COMMAND.length).trim();
-
-      if (newName) {
-        await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
-        CONVERSATION_BASENAME = newName;
-      } else {
-        console.log(
-          META_FORMAT(`No name provided. Usage: ${RENAME_COMMAND} <name>`)
-        );
-      }
+      await store.execute(renameCommand, newName);
     },
   },
 
   [AUTO_NAME_COMMAND]: {
     help: "Generate a title for the conversation.",
-    run: async (input: string) => {
-      const newName = await generateTitle(model, messages);
-
-      if (newName) {
-        await renameConversation(ROOT_DIR, CONVERSATION_BASENAME, newName);
-        CONVERSATION_BASENAME = newName;
-      } else {
-        console.log(META_FORMAT(`No name suggested.`));
-      }
+    run: async (_input: string) => {
+      await store.execute(autoNameCommand);
     },
   },
 
   [DELETE_COMMAND]: {
     help: "Delete the current conversation and start a new one.",
-    run: async (input: string) => {
-      console.clear();
-
-      await $`rm ${ROOT_DIR}/${CONVERSATION_BASENAME}.md`;
-      console.log(
-        META_FORMAT(`Deleted conversation "${CONVERSATION_BASENAME}"`)
-      );
-
-      messages.length = 0;
-      CONVERSATION_BASENAME = uuid4();
-
-      setTerminalTitle(CONVERSATION_BASENAME);
-
-      console.log(META_FORMAT(`Started a new conversation with ${model}.`));
+    run: async (_input: string) => {
+      await store.execute(deleteCommand);
     },
   },
 
   [DROP_LAST_COMMAND]: {
     help: "Drop the last user/assistant message pair from the conversation.",
-    run: async (input: string) => {
-      if (messages.length < 2) {
-        console.log(META_FORMAT(`No messages to drop.`));
-      } else {
-        messages.pop();
-        messages.pop();
-
-        await writeConversation(ROOT_DIR, CONVERSATION_BASENAME, messages, {
-          model,
-        });
-
-        console.log(META_FORMAT(`Dropped last message.`));
-      }
+    run: async (_input: string) => {
+      await store.execute(dropLastMessageCommand);
     },
   },
 
   [WRITE_LAST_COMMAND]: {
     help: "Write the last message to a file.",
     run: async (input: string) => {
-      if (messages.length === 0) {
-        console.log(META_FORMAT(`No message to write.`));
-      } else {
-        const filename = input.slice(WRITE_LAST_COMMAND.length).trim();
-
-        if (filename) {
-          await fs.writeFile(
-            withDefaultExtension(filename, ".md"),
-            messages[messages.length - 1].content,
-            "utf8"
-          );
-
-          console.log(META_FORMAT(`Wrote last message to "${filename}".`));
-        } else {
-          console.log(
-            META_FORMAT(
-              `No filename provided. Usage: ${WRITE_LAST_COMMAND} <filename>`
-            )
-          );
-        }
-      }
+      const filename = input.slice(WRITE_LAST_COMMAND.length).trim();
+      await store.execute(writeLastMessageCommand, filename);
     },
   },
 
   [PWD_COMMAND]: {
     help: "Show the current working directory.",
-    run: async (input: string) => {
-      console.log(META_FORMAT(`Current working directory: ${ROOT_DIR}`));
+    run: async (_input: string) => {
+      await store.execute(pwdCommand);
     },
   },
 };
@@ -388,13 +334,14 @@ while (true) {
     continue;
   }
 
-  setTerminalTitle(CONVERSATION_BASENAME);
+  setTerminalTitle(selectTerminalTitle(store.getState()));
 
-  appendMessage({ role: "user", content: inputBuffer });
+  await appendMessage(store, { role: "user", content: inputBuffer });
 
+  const { messages, model } = store.getState();
   const response = await completeConversation(model, messages);
 
-  appendMessage({
+  await appendMessage(store, {
     role: "assistant",
     content: response,
   });
