@@ -1,9 +1,10 @@
 import { Conversation } from "./llm-types";
+import { Store } from "./store";
 
 // Slash commands
 export type SlashCommand = {
   help: string;
-  run: (input: string) => Promise<void>;
+  run: (store: Store<State>, input: string) => Promise<void>;
 };
 
 export type State = {

@@ -1,3 +1,4 @@
+import "zx/globals";
 import { setTerminalTitle } from "../set-terminal-title";
 import { META_FORMAT } from "./constants";
 

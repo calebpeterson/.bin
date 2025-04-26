@@ -1,5 +1,6 @@
+import { setTerminalTitle } from "../../set-terminal-title";
 import { META_FORMAT } from "../constants";
-import { selectCanDropLastMessage } from "../selectors";
+import { selectCanDropLastMessage, selectTerminalTitle } from "../selectors";
 import { Action } from "../store";
 import { State } from "../types";
 import { writeConversation } from "../write-conversation";
@@ -19,5 +20,14 @@ export const dropLastMessageCommand: Action<State> = async (state) => {
     );
 
     console.log(META_FORMAT(`Dropped last message.`));
+
+    const newState = {
+      ...state,
+      messages: updatedMessages,
+    };
+
+    setTerminalTitle(selectTerminalTitle(newState));
+
+    return newState;
   }
 };

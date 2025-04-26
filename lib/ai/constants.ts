@@ -6,4 +6,4 @@ export const USER_PROMPT_2 = chalk.blue("  ");
 export const ASSISTANT_FORMAT = (text: string) => chalk.blue(text);
 export const ASSISTANT_PROMPT = ASSISTANT_FORMAT("");
 
-export const META_FORMAT = (text: string) => chalk.grey(`⛭ ${text}`);
+export const META_FORMAT = (text: string) => chalk.magenta.dim(` ⛭ ${text}`);
