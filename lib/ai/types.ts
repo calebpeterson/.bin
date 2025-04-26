@@ -11,5 +11,6 @@ export type State = {
   CONVERSATION_BASENAME: string;
   ROOT_DIR: string;
   model: string;
+  temperature: number;
   messages: Conversation;
 };

@@ -3,6 +3,7 @@ import { Conversation } from "./llm-types";
 
 export interface StringifyChatOptions {
   model?: string;
+  temperature?: number;
 }
 
 /**
@@ -15,10 +16,13 @@ export const stringifyChat = (
   messages: Conversation,
   options: StringifyChatOptions = {}
 ): string => {
-  const { model } = options;
+  const { model, temperature } = options;
 
   // Construct frontmatter
-  const meta = model ? { model } : {};
+  const meta = {
+    ...(model ? { model } : {}),
+    ...(temperature ? { temperature } : {}),
+  };
   const frontmatter =
     Object.keys(meta).length > 0
       ? matter.stringify("", meta).trim() + "\n\n"

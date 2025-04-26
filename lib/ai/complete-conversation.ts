@@ -3,12 +3,14 @@ import { formatMarkdown } from "../format-markdown";
 import { hr } from "../horizontal-rule";
 import { getAiSdkModel } from "./ai-sdk";
 import { ASSISTANT_PROMPT } from "./constants";
+import { DEFAULT_TEMPERATURE } from "./get-temperature";
 import { Conversation } from "./llm-types";
 
 // Complete the user input and stream the response
 export async function completeConversation(
   model: string,
-  messages: Conversation
+  messages: Conversation,
+  temperature: number = DEFAULT_TEMPERATURE
 ) {
   hr();
 
@@ -17,6 +19,7 @@ export async function completeConversation(
   await spinner(async () => {
     const { text } = await generateText({
       model: getAiSdkModel(model),
+      temperature,
       messages,
     });
 

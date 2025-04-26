@@ -14,6 +14,7 @@ import {
 } from "./lib/ai/constants";
 import { countWords } from "./lib/ai/count-words";
 import { estimateReadingTime } from "./lib/ai/estimate-reading-time";
+import { getTemperature } from "./lib/ai/get-temperature";
 import { listConversations } from "./lib/ai/list-conversations";
 import { listModels } from "./lib/ai/list-models";
 import { Conversation } from "./lib/ai/llm-types";
@@ -38,6 +39,7 @@ const store = new Store<State>({
   ROOT_DIR,
   CONVERSATION_BASENAME: uuid4(),
   model: argv.model ?? "gpt-4o",
+  temperature: getTemperature(argv.temperature),
   messages: [],
 });
 
@@ -58,6 +60,7 @@ if (argv.models) {
   process.exit(0);
 }
 
+// Complete a prompt
 if (argv.complete) {
   const conversationBasename = argv.complete;
 
@@ -75,8 +78,10 @@ if (argv.complete) {
   const { meta, messages } = await parseChat(content);
 
   const model = "model" in meta ? (meta.model as string) : "gpt-4o";
+  const temperature =
+    "temperature" in meta ? getTemperature(meta.temperature) : 0.7;
 
-  const response = await completeConversation(model, messages);
+  const response = await completeConversation(model, messages, temperature);
 
   const completed: Conversation = [
     ...messages,
@@ -158,6 +163,10 @@ if (argv.continue || argv.resume) {
     store.set("model", meta.model as string);
   }
 
+  if ("temperature" in meta) {
+    store.set("temperature", getTemperature(meta.temperature));
+  }
+
   store.set("messages", [...history]);
 
   const lastMessage = history[history.length - 1];
@@ -231,8 +240,8 @@ while (true) {
 
   await appendMessage(store, { role: "user", content: inputBuffer });
 
-  const { messages, model } = store.getState();
-  const response = await completeConversation(model, messages);
+  const { messages, model, temperature } = store.getState();
+  const response = await completeConversation(model, messages, temperature);
 
   await appendMessage(store, {
     role: "assistant",

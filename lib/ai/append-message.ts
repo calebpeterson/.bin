@@ -19,6 +19,6 @@ export const appendMessage = async (
     state.ROOT_DIR,
     state.CONVERSATION_BASENAME,
     state.messages,
-    { model: state.model }
+    { model: state.model, temperature: state.temperature }
   );
 };
