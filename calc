@@ -1,0 +1,83 @@
+#!/usr/bin/env -S node --no-warnings
+
+import clipboard from "clipboardy";
+import lodash from "lodash";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import repl from "node:repl";
+import { pathToFileURL } from "node:url";
+
+// Helpers
+const isPlainObject = (val) =>
+  typeof val === "object" && val !== null && !Array.isArray(val);
+
+const isSerializable = (val) => isPlainObject(val) || Array.isArray(val);
+
+// Start REPL
+const server = repl.start({
+  prompt: "▶︎ ",
+  ignoreUndefined: true,
+});
+
+// Preserve and override default eval for clipboard copy
+const originalEval = server.eval;
+
+server.eval = (cmd, context, filename, callback) => {
+  originalEval.call(server, cmd, context, filename, (err, result) => {
+    if (!err && result !== undefined) {
+      try {
+        if (typeof result === "function") {
+          console.log("[Skipped copy: result is a function]");
+        } else if (isSerializable(result)) {
+          clipboard.writeSync(JSON.stringify(result, null, 2));
+          console.log("[Auto-copied JSON to clipboard]");
+        } else {
+          clipboard.writeSync(String(result));
+          console.log("[Auto-copied to clipboard]");
+        }
+      } catch (copyErr) {
+        console.error("Clipboard error:", copyErr);
+      }
+    }
+
+    callback(err, result);
+  });
+};
+
+// Inject Math.* functions
+Object.getOwnPropertyNames(Math).forEach((key) => {
+  server.context[key] = Math[key];
+});
+
+// Inject lodash.* functions directly, without assigning `_`
+Object.entries(lodash).forEach(([key, fn]) => {
+  if (typeof fn === "function" && key !== "_") {
+    server.context[key] = fn;
+  }
+});
+
+// Load custom modules from ~/.calc/
+const userDir = path.join(os.homedir(), ".calc");
+
+if (fs.existsSync(userDir)) {
+  const files = fs
+    .readdirSync(userDir)
+    .filter((f) => f.endsWith(".js") || f.endsWith(".mjs"));
+
+  for (const file of files) {
+    const fullPath = path.join(userDir, file);
+    const url = pathToFileURL(fullPath).href;
+    try {
+      const mod = await import(url);
+      if (mod && typeof mod === "object") {
+        Object.entries(mod).forEach(([key, value]) => {
+          server.context[key] = value;
+        });
+        console.log(`[Loaded ${file}]`);
+      }
+    } catch (err) {
+      console.error(`[Failed to load ${file}]:`, err.message);
+    }
+  }
+}
