@@ -1,5 +1,6 @@
 #!/usr/bin/env -S node --no-warnings
 
+import chalk from "chalk";
 import clipboard from "clipboardy";
 import lodash from "lodash";
 import fs from "node:fs";
@@ -8,11 +9,7 @@ import path from "node:path";
 import repl from "node:repl";
 import { pathToFileURL } from "node:url";
 
-// Helpers
-const isPlainObject = (val) =>
-  typeof val === "object" && val !== null && !Array.isArray(val);
-
-const isSerializable = (val) => isPlainObject(val) || Array.isArray(val);
+const isSerializable = (val) => lodash.isPlainObject(val) || Array.isArray(val);
 
 // Start REPL
 const server = repl.start({
@@ -27,17 +24,17 @@ server.eval = (cmd, context, filename, callback) => {
   originalEval.call(server, cmd, context, filename, (err, result) => {
     if (!err && result !== undefined) {
       try {
-        if (typeof result === "function") {
-          console.log("[Skipped copy: result is a function]");
+        if (lodash.isFunction(result)) {
+          console.log(chalk.grey`[Skipped copy: result is a function]`);
         } else if (isSerializable(result)) {
           clipboard.writeSync(JSON.stringify(result, null, 2));
-          console.log("[Auto-copied JSON to clipboard]");
+          console.log(chalk.grey`[Copied serialized result to clipboard]`);
         } else {
           clipboard.writeSync(String(result));
-          console.log("[Auto-copied to clipboard]");
+          console.log(chalk.grey`[Copied ${result} to clipboard]`);
         }
       } catch (copyErr) {
-        console.error("Clipboard error:", copyErr);
+        console.error(chalk.red`Clipboard error:`, copyErr);
       }
     }
 
@@ -72,8 +69,15 @@ if (fs.existsSync(userDir)) {
       const mod = await import(url);
       if (mod && typeof mod === "object") {
         Object.entries(mod).forEach(([key, value]) => {
-          server.context[key] = value;
+          if (key !== "_") {
+            server.context[key] = value;
+          } else {
+            console.warn(
+              chalk.yellow`Ignored _ export from "${file}"; it would disable expression assignment support.`
+            );
+          }
         });
+
         console.log(`[Loaded ${file}]`);
       }
     } catch (err) {
